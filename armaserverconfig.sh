@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# armaserverconfig.sh (CLI-Only Version) - Version 1.0 - 2025-03-20
+# armaserverconfig.sh (CLI-Only Version) - Version 1.1 - 2025-03-20
 #
 # Copyright (c) 2025 Hanzerik307
 #
@@ -122,18 +122,19 @@ validate_ip() {
 
 # Function to manage service
 manage_service() {
+    if ! systemctl --user is-enabled arma.service &>/dev/null && [ "$1" != "create_template" ]; then
+        echo -e "${YELLOW}Warning: arma.service is not set up. Use 'Create Service Template' to configure it first.${RESET}"
+        return 1
+    fi
     case $1 in
         start)
-            systemctl --user start arma.service
-            echo -e "${GREEN}Arma service started${RESET}"
+            systemctl --user start arma.service && echo -e "${GREEN}Arma service started${RESET}"
             ;;
         stop)
-            systemctl --user stop arma.service
-            echo -e "${GREEN}Arma service stopped${RESET}"
+            systemctl --user stop arma.service && echo -e "${GREEN}Arma service stopped${RESET}"
             ;;
         restart)
-            systemctl --user restart arma.service
-            echo -e "${GREEN}Arma service restarted${RESET}"
+            systemctl --user restart arma.service && echo -e "${GREEN}Arma service restarted${RESET}"
             ;;
         status)
             systemctl --user status arma.service
@@ -245,17 +246,6 @@ EOF
     fi
 }
 
-# Function to clean service logs
-clean_logs() {
-    echo "Current disk usage for arma.service logs:"
-    journalctl --user -u arma.service --disk-usage
-    read -p "Enter time to keep logs (e.g., 7days, 2weeks): " TIME
-    if [ -n "$TIME" ]; then
-        journalctl --user -u arma.service --vacuum-time="$TIME"
-        echo -e "${GREEN}Logs cleaned for arma.service (kept last $TIME).${RESET}"
-    fi
-}
-
 # Function to enable lingering
 enable_lingering() {
     if loginctl show-user "$USER" | grep -q "Linger=yes"; then
@@ -284,18 +274,17 @@ get_json_value() {
 list_players() {
     journalctl --user -u arma.service --since "-6 hours" | grep "PlayerId" > /tmp/players_raw.txt
     if [ -s /tmp/players_raw.txt ]; then
-        echo "Player Information (Last 6 Hours):" > /tmp/players.txt
-        while IFS= read -r line; do
+        echo "Players (Last 6 Hours):" > /tmp/players.txt
+        echo "---------------------" >> /tmp/players.txt
+        sort -u /tmp/players_raw.txt | while IFS= read -r line; do
             NAME=$(echo "$line" | grep -o "Name=[^,]*" | cut -d'=' -f2 | tr -d ' ')
             IDENTITY_ID=$(echo "$line" | grep -o "IdentityId=[^ ]*" | cut -d'=' -f2 | tr -d ' ')
-            if [ -n "$IDENTITY_ID" ]; then
-                echo "Name: $NAME, IdentityId: $IDENTITY_ID" >> /tmp/players.txt
-            fi
-        done < /tmp/players_raw.txt
+            [ -n "$IDENTITY_ID" ] && printf "Name: %-20s IdentityId: %s\n" "$NAME" "$IDENTITY_ID" >> /tmp/players.txt
+        done
         cat /tmp/players.txt
         rm /tmp/players_raw.txt /tmp/players.txt
     else
-        echo -e "${YELLOW}No player entries found in the last 6 hours.${RESET}"
+        echo -e "${YELLOW}No player entries found in the last 6 hours. Check if the server is running.${RESET}"
         rm /tmp/players_raw.txt
     fi
 }
@@ -463,9 +452,10 @@ while true; do
                 echo "  8) Set Server Min Grass Distance (Default 0)"
                 echo "  9) Set Network View Distance (Default 1500)"
                 echo "  10) Set Disable 3rd Person"
-                echo "  11) Review Server Config"
-                echo "  12) Back"
-                read -p "Enter configuration option (1-12): " CONFIGURE_ACTION
+                echo "  11) Set Public IP Address"
+                echo "  12) Review Server Config"
+                echo "  13) Back"
+                read -p "Enter configuration option (1-13): " CONFIGURE_ACTION
                 case $CONFIGURE_ACTION in
                     1) # Set Server Name
                         CURRENT_NAME=$(get_json_value ".game.name")
@@ -572,7 +562,18 @@ while true; do
                             update_json ".game.gameProperties.disableThirdPerson = false"
                         fi
                         ;;
-                    11) # Review Server Config
+                    11) # Set Public IP Address
+                        CURRENT_IP=$(get_json_value ".publicAddress")
+                        echo "Current public IP address: $CURRENT_IP"
+                        read -p "Enter new public IP address: " PUBLIC_IP
+                        if validate_ip "$PUBLIC_IP"; then
+                            update_json ".publicAddress = \"$PUBLIC_IP\""
+                            update_json ".a2s.address = \"$PUBLIC_IP\""
+                        else
+                            echo -e "${YELLOW}Error: Invalid IP address format.${RESET}"
+                        fi
+                        ;;
+                    12) # Review Server Config
                         if ! command -v jq &> /dev/null; then
                             echo -e "${YELLOW}Error: jq is not installed. Cannot view JSON configuration.${RESET}"
                         elif jq . "$CONFIG_FILE" 2>/dev/null; then
@@ -581,7 +582,7 @@ while true; do
                             echo -e "${YELLOW}Error: Unable to read server JSON at $CONFIG_FILE${RESET}"
                         fi
                         ;;
-                    12) # Back
+                    13) # Back
                         break
                         ;;
                     *) echo -e "${YELLOW}Invalid configuration option.${RESET}" ;;
@@ -597,19 +598,17 @@ while true; do
                 echo "  3) Restart"
                 echo "  4) Status"
                 echo "  5) Create Service Template"
-                echo "  6) Clean Service Logs"
-                echo "  7) Enable Lingering"
-                echo "  8) Back"
-                read -p "Enter service action (1-8): " SERVICE_ACTION
+                echo "  6) Enable Lingering"
+                echo "  7) Back"
+                read -p "Enter service action (1-7): " SERVICE_ACTION
                 case $SERVICE_ACTION in
                     1) manage_service "start" ;;
                     2) manage_service "stop" ;;
                     3) manage_service "restart" ;;
                     4) manage_service "status" ;;
                     5) manage_service "create_template" ;;
-                    6) clean_logs ;;
-                    7) enable_lingering ;;
-                    8) break ;;
+                    6) enable_lingering ;;
+                    7) break ;;
                     *) echo -e "${YELLOW}Invalid service action.${RESET}" ;;
                 esac
                 echo
