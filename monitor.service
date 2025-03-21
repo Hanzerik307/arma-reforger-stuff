@@ -1,0 +1,11 @@
+[Unit]
+Description=Monitor arma.service logs in real-time for POSTGAME and restart
+After=arma.service
+
+[Service]
+ExecStart=/home/<username>/bin/monitor.sh
+Restart=always
+Type=simple
+
+[Install]
+WantedBy=default.target

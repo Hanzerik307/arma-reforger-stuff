@@ -1,0 +1,14 @@
+[Unit]
+Description=Arma Reforger Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/<username>/arma
+ExecStart=/home/<username>/arma/start.sh
+Restart=always
+
+[Install]
+WantedBy=default.target
+
+

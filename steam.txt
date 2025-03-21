@@ -1,0 +1,4 @@
+@ShutdownOnFailedCommand 1
+login anonymous
+app_update 1874900 validate
+quit

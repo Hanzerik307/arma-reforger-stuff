@@ -1,0 +1,42 @@
+{
+  "publicAddress": "123.123.123.",
+  "publicPort": 2001,
+  "a2s": {
+    "address": "123.123.123.123",
+    "port": 17777
+  },
+  "game": {
+    "name": "Wyoming 307",
+    "password": "GamePassword",
+    "passwordAdmin": "AdminPassword",
+    "admins": [],
+    "scenarioId": "{DAA03C6E6099D50F}Missions/24_CombatOps.conf",
+    "maxPlayers": 6,
+    "visible": true,
+    "crossPlatform": true,
+    "supportedPlatforms": [
+      "PLATFORM_PC",
+      "PLATFORM_XBL",
+      "PLATFORM_PSN"
+    ],
+    "gameProperties": {
+      "serverMaxViewDistance": 1500,
+      "serverMinGrassDistance": 50,
+      "networkViewDistance": 1000,
+      "disableThirdPerson": false,
+      "fastValidation": true,
+      "battlEye": true,
+      "VONDisableUI": false,
+      "VONDisableDirectSpeechUI": false,
+      "VONCanTransmitCrossFaction": false
+    },
+    "mods": []
+  },
+  "operating": {
+    "lobbyPlayerSynchronise": true,
+    "joinQueue": {
+      "maxSize": 2
+    },
+    "disableNavmeshStreaming": []
+  }
+}
