@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# armaserverconfig.sh (CLI-Only Version) - Version 1.1 - 2025-03-20
+# armaserverconfig.sh (CLI-Only Version) - Version 1.2 - 2025-03-26
 #
 # Copyright (c) 2025 Hanzerik307
 #
@@ -22,19 +22,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# Settings file to store the last selected config
-TEMPLATE_DIR="$HOME/.armaserverconfig"
-SETTINGS_FILE="$TEMPLATE_DIR/armaserverconfig.ini"
-TEMPLATE_FILE="$TEMPLATE_DIR/arma.service.template"
+# Fixed paths for server files and templates
+CONFIG_FILE="$HOME/arma/server.json"       # Main server configuration file
+ADDONS_DIR="$HOME/arma/profile/addons"     # Directory where mods are stored
+TEMPLATE_DIR="$HOME/.armaserverconfig"     # Directory for template files
 
-# Load config file from settings, default if not set
-if [ -f "$SETTINGS_FILE" ]; then
-    CONFIG_FILE=$(grep "^CONFIG_FILE=" "$SETTINGS_FILE" | cut -d'=' -f2)
-else
-    CONFIG_FILE="$HOME/arma/server.json"
-fi
-
-# Array of scenarios (index => scenarioId and description)
+# Array of predefined scenarios (format: scenarioId|description)
 SCENARIOS=(
     "{ECC61978EDCC2B5A}Missions/23_Campaign.conf|Conflict - Everon"
     "{59AD59368755F41A}Missions/21_GM_Eden.conf|Game Master - Everon"
@@ -54,18 +47,19 @@ SCENARIOS=(
     "{2B4183DF23E88249}Missions/CAH_Morton.conf|Capture & Hold: Morton"
 )
 
-# Colors
-RED='\e[31m'
-GREEN='\e[32m'
-YELLOW='\e[33m'
-RESET='\e[0m'
+# Colors for terminal output (brighter versions)
+RED='\e[91m'     # Bright Red for errors
+GREEN='\e[92m'   # Bright Green for success messages
+YELLOW='\e[93m'  # Bright Yellow for warnings
+CYAN='\e[96m'    # Bright Cyan for active mods
+MAGENTA='\e[95m' # Bright Magenta for installed mods
+RESET='\e[0m'    # Reset to default terminal color
 
-# Check for jq at startup and warn if not installed
+# Check if jq is installed (required for JSON manipulation)
 if ! command -v jq &> /dev/null; then
     echo -e "${YELLOW}Warning: jq is not installed.${RESET}"
     echo "jq is required for editing or viewing JSON configuration files."
-    echo "Without it, options like 'Configure Server' and 'Review Server Config' will not work."
-    echo "You can still use other features (e.g., managing the service or listing players)."
+    echo "You can still use other features (e.g., managing the service)."
     echo
     read -p "Would you like to: [1] Install jq now, [2] See Help/About, or [3] Continue anyway? (1-3): " JQ_CHOICE
     case $JQ_CHOICE in
@@ -74,7 +68,7 @@ if ! command -v jq &> /dev/null; then
             if [ $? -eq 0 ]; then
                 echo -e "${GREEN}Successfully installed jq.${RESET}"
             else
-                echo -e "${YELLOW}Error: Failed to install jq. Proceeding without it.${RESET}"
+                echo -e "${RED}Error: Failed to install jq. Proceeding without it.${RESET}"
             fi
             ;;
         2)
@@ -84,28 +78,41 @@ if ! command -v jq &> /dev/null; then
             echo -e "${GREEN}Continuing without jq.${RESET}"
             ;;
         *)
-            echo -e "${YELLOW}Invalid choice. Continuing without jq.${RESET}"
+            echo -e "${RED}Invalid choice. Continuing without jq.${RESET}"
             ;;
     esac
     echo
+    read -p "Press Enter to continue..." 
+    clear
 fi
 
-# Function to update JSON file
+# Update the server.json file with a jq filter
 update_json() {
     if ! command -v jq &> /dev/null; then
-        echo -e "${YELLOW}Error: jq is not installed. Cannot edit JSON configuration.${RESET}"
+        echo -e "${RED}Error: jq is not installed. Cannot edit JSON configuration.${RESET}"
         return 1
     fi
     if [ ! -f "$CONFIG_FILE" ]; then
-        echo -e "${YELLOW}Error: No server JSON set. Use 'Search for Server JSON' to select one.${RESET}"
+        echo -e "${RED}Error: $CONFIG_FILE not found. Create it with 'Create Template Files'.${RESET}"
         return 1
     fi
+    local filter="$1"
+    local slurp_file="$2"
     local tmp_file=$(mktemp)
-    jq "$1" "$CONFIG_FILE" > "$tmp_file" && mv "$tmp_file" "$CONFIG_FILE"
-    echo -e "${GREEN}Configuration updated successfully. Restart service after all changes are made.${RESET}"
+    if [ -n "$slurp_file" ]; then
+        jq --slurpfile mods "$slurp_file" "$filter" "$CONFIG_FILE" > "$tmp_file" && mv "$tmp_file" "$CONFIG_FILE"
+    else
+        jq "$filter" "$CONFIG_FILE" > "$tmp_file" && mv "$tmp_file" "$CONFIG_FILE"
+    fi
+    # Check if the update succeeded
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Configuration updated successfully. Restart service after all changes are made.${RESET}"
+    else
+        echo -e "${RED}Error: Failed to update configuration file.${RESET}"
+    fi
 }
 
-# Function to validate IP address
+# Validate an IP address format
 validate_ip() {
     if [[ "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
         IFS='.' read -r -a octets <<< "$1"
@@ -120,51 +127,39 @@ validate_ip() {
     fi
 }
 
-# Function to manage service
+# Manage the systemd service for the Arma server
 manage_service() {
-    if ! systemctl --user is-enabled arma.service &>/dev/null && [ "$1" != "create_template" ]; then
-        echo -e "${YELLOW}Warning: arma.service is not set up. Use 'Create Service Template' to configure it first.${RESET}"
+    if ! systemctl --user is-enabled arma.service &>/dev/null; then
+        echo -e "${YELLOW}Warning: arma.service is not set up. Use 'Create Template Files' and follow 'Service Setup' in Help/About.${RESET}"
+        read -p "Press Enter to continue..." 
+        clear
         return 1
     fi
     case $1 in
         start)
-            systemctl --user start arma.service && echo -e "${GREEN}Arma service started${RESET}"
+            systemctl --user start arma.service && echo -e "${GREEN}Arma service started${RESET}" || echo -e "${RED}Error: Failed to start service${RESET}"
+            read -p "Press Enter to continue..." 
+            clear
             ;;
         stop)
-            systemctl --user stop arma.service && echo -e "${GREEN}Arma service stopped${RESET}"
+            systemctl --user stop arma.service && echo -e "${GREEN}Arma service stopped${RESET}" || echo -e "${RED}Error: Failed to stop service${RESET}"
+            read -p "Press Enter to continue..." 
+            clear
             ;;
         restart)
-            systemctl --user restart arma.service && echo -e "${GREEN}Arma service restarted${RESET}"
+            systemctl --user restart arma.service && echo -e "${GREEN}Arma service restarted${RESET}" || echo -e "${RED}Error: Failed to restart service${RESET}"
+            read -p "Press Enter to continue..." 
+            clear
             ;;
         status)
-            systemctl --user status arma.service
-            ;;
-        create_template)
-            read -p "Would you like to create a service template file at $TEMPLATE_FILE? (y/N): " CONFIRM
-            if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
-                mkdir -p "$TEMPLATE_DIR"
-                cat > "$TEMPLATE_FILE" << 'EOF'
-[Unit]
-Description=Arma Reforger Server
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/home/<username>/arma/start.sh
-Restart=always
-WorkingDirectory=/home/<username>/arma
-
-[Install]
-WantedBy=default.target
-EOF
-                echo -e "${GREEN}Service template successfully created at: $TEMPLATE_FILE${RESET}"
-                echo "See 'Help/About' for setup instructions."
-            fi
+            systemctl --user status arma.service --no-pager -n 0
+            read -p "Press Enter to continue..." 
+            clear
             ;;
     esac
 }
 
-# Function to create template files (install.sh.template, steam.txt.template, start.sh.template, server.json.template)
+# Create template files for server installation and configuration
 create_template_files() {
     echo "This will create template files for installing and running an Arma Reforger server."
     echo "Files will be placed in: $TEMPLATE_DIR"
@@ -172,35 +167,28 @@ create_template_files() {
     echo "- steam.txt.template: SteamCMD configuration"
     echo "- start.sh.template: Server startup script"
     echo "- server.json.template: Default server configuration"
+    echo "- arma.service.tpl: Systemd service template"
     read -p "Would you like to create these template files? (y/N): " CONFIRM
     if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
         mkdir -p "$TEMPLATE_DIR"
-        # install.sh.template
-        cat > "$TEMPLATE_DIR/install.sh.template" << 'EOF'
+        cat > "$TEMPLATE_DIR/install.sh.template" << EOF
 #!/bin/bash
 /usr/games/steamcmd +force_install_dir $HOME/arma +runscript $HOME/arma/steam.txt
 EOF
-        # steam.txt.template
         cat > "$TEMPLATE_DIR/steam.txt.template" << 'EOF'
 @ShutdownOnFailedCommand 1
 login anonymous
 app_update 1874900 validate
 quit
 EOF
-        # start.sh.template
-        cat > "$TEMPLATE_DIR/start.sh.template" << 'EOF'
+        cat > "$TEMPLATE_DIR/start.sh.template" << EOF
 #!/bin/bash
-$HOME/arma/ArmaReforgerServer -config=$HOME/arma/server.json -profile=$HOME/arma -maxFPS=60
+$HOME/arma/ArmaReforgerServer -config=$HOME/arma/server.json -profile=$HOME/arma/profile -maxFPS=60
 EOF
-        # server.json.template
-        cat > "$TEMPLATE_DIR/server.json.template" << 'EOF'
+        cat > "$TEMPLATE_DIR/server.json.template" << EOF
 {
   "publicAddress": "123.123.123.123",
   "publicPort": 2001,
-  "a2s": {
-    "address": "123.123.123.123",
-    "port": 17777
-  },
   "game": {
     "name": "Wyoming 307",
     "password": "GamePassword",
@@ -239,14 +227,32 @@ EOF
   }
 }
 EOF
+        cat > "$TEMPLATE_DIR/arma.service.tpl" << EOF
+[Unit]
+Description=Arma Reforger Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/$USER/arma/start.sh
+WorkingDirectory=/home/$USER/arma
+Restart=always
+
+[Install]
+WantedBy=default.target
+EOF
         chmod +x "$TEMPLATE_DIR/install.sh.template" "$TEMPLATE_DIR/start.sh.template"
         echo -e "${GREEN}Template files successfully created in: $TEMPLATE_DIR${RESET}"
-        echo "Files: install.sh.template, steam.txt.template, start.sh.template, server.json.template"
+        echo "Files: install.sh.template, steam.txt.template, start.sh.template, server.json.template, arma.service.tpl"
         echo "See 'Help/About' for usage instructions."
+    else
+        echo "Template file creation cancelled."
     fi
+    read -p "Press Enter to continue..." 
+    clear
 }
 
-# Function to enable lingering
+# Enable lingering to keep services running after logout
 enable_lingering() {
     if loginctl show-user "$USER" | grep -q "Linger=yes"; then
         echo -e "${GREEN}Lingering is already enabled for $USER.${RESET}"
@@ -254,12 +260,20 @@ enable_lingering() {
         read -p "Enable lingering for $USER? This keeps services running after logout (y/N): " CONFIRM
         if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
             sudo loginctl enable-linger "$USER"
-            echo -e "${GREEN}Lingering enabled for $USER.${RESET}"
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}Lingering enabled for $USER.${RESET}"
+            else
+                echo -e "${RED}Error: Failed to enable lingering.${RESET}"
+            fi
+        else
+            echo "Lingering enablement cancelled."
         fi
     fi
+    read -p "Press Enter to continue..." 
+    clear
 }
 
-# Function to get current value from JSON
+# Get a value from the server.json file
 get_json_value() {
     if ! command -v jq &> /dev/null; then
         echo "Unknown (jq not installed)"
@@ -270,26 +284,7 @@ get_json_value() {
     fi
 }
 
-# Function to list players from journalctl (only Name and IdentityId, 6 hours)
-list_players() {
-    journalctl --user -u arma.service --since "-6 hours" | grep "PlayerId" > /tmp/players_raw.txt
-    if [ -s /tmp/players_raw.txt ]; then
-        echo "Players (Last 6 Hours):" > /tmp/players.txt
-        echo "---------------------" >> /tmp/players.txt
-        sort -u /tmp/players_raw.txt | while IFS= read -r line; do
-            NAME=$(echo "$line" | grep -o "Name=[^,]*" | cut -d'=' -f2 | tr -d ' ')
-            IDENTITY_ID=$(echo "$line" | grep -o "IdentityId=[^ ]*" | cut -d'=' -f2 | tr -d ' ')
-            [ -n "$IDENTITY_ID" ] && printf "Name: %-20s IdentityId: %s\n" "$NAME" "$IDENTITY_ID" >> /tmp/players.txt
-        done
-        cat /tmp/players.txt
-        rm /tmp/players_raw.txt /tmp/players.txt
-    else
-        echo -e "${YELLOW}No player entries found in the last 6 hours. Check if the server is running.${RESET}"
-        rm /tmp/players_raw.txt
-    fi
-}
-
-# Function to list scenarios
+# Display the list of available scenarios
 list_scenarios() {
     echo "Available Scenarios:"
     for i in "${!SCENARIOS[@]}"; do
@@ -298,45 +293,201 @@ list_scenarios() {
     done
 }
 
-# Function to search for server JSON files and save selection
-search_configs() {
-    CONFIG_LIST=$(find "$HOME" -type f -name "*.json" -exec sh -c 'if [ -f "$(dirname "{}")/ArmaReforgerServer" ] || grep -q "scenarioId" "{}"; then echo "{}"; fi' \; 2>/dev/null)
-    if [ -z "$CONFIG_LIST" ]; then
-        echo -e "${YELLOW}No Arma Reforger server JSON files found in $HOME.${RESET}"
-        return
+# Manage mods in the server configuration
+manage_mods() {
+    if ! command -v jq &> /dev/null; then
+        echo -e "${RED}Error: jq is not installed. Cannot manage mods.${RESET}"
+        read -p "Press Enter to continue..." 
+        clear
+        return 1
+    fi
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo -e "${RED}Error: $CONFIG_FILE not found. Create it with 'Create Template Files'.${RESET}"
+        read -p "Press Enter to continue..." 
+        clear
+        return 1
+    fi
+    if [ ! -d "$ADDONS_DIR" ]; then
+        echo -e "${YELLOW}Warning: $ADDONS_DIR not found. Start the server to create it or check your setup.${RESET}"
     fi
 
-    echo "Found server JSON files:"
-    i=1
-    while IFS= read -r config; do
-        echo "  $i) $config"
-        ((i++))
-    done <<< "$CONFIG_LIST"
-    read -p "Enter server JSON number to use (or Enter to skip): " NEW_CONFIG_NUM
-    if [ -n "$NEW_CONFIG_NUM" ] && [ "$NEW_CONFIG_NUM" -ge 1 ] && [ "$NEW_CONFIG_NUM" -lt "$i" ]; then
-        NEW_CONFIG=$(echo "$CONFIG_LIST" | sed -n "${NEW_CONFIG_NUM}p")
-        CONFIG_FILE="$NEW_CONFIG"
-        mkdir -p "$TEMPLATE_DIR"
-        echo "CONFIG_FILE=$CONFIG_FILE" > "$SETTINGS_FILE"
-        echo -e "${GREEN}Server JSON set to: $CONFIG_FILE${RESET}"
-        echo "Saved to $SETTINGS_FILE"
-    fi
+    # Temporary file to store current mods
+    TEMP_MODS=$(mktemp)
+    jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"
+
+    while true; do
+        # Load metadata from installed mods
+        declare -A META_DATA
+        declare -A INSTALLED_MODS
+        if [ -d "$ADDONS_DIR" ]; then
+            meta_files=$(find "$ADDONS_DIR" -type f -name "meta" -not -path "*/core/*" -not -path "*/data/*" 2>/dev/null)
+            if [ -n "$meta_files" ]; then
+                while IFS= read -r meta_file; do
+                    id=$(jq -r '.meta.id' "$meta_file" 2>/dev/null)
+                    name=$(jq -r '.meta.name // "Unknown"' "$meta_file" 2>/dev/null)
+                    version=$(jq -r '.meta.versions[0].version // "Unknown"' "$meta_file" 2>/dev/null)
+                    [ -z "$id" ] || [ "$id" = "null" ] && continue
+                    META_DATA["$id"]="$name|$version"
+                    INSTALLED_MODS["$id"]=1
+                done <<< "$meta_files"
+            fi
+        fi
+
+        # Display active mods from server.json
+        echo -e "${CYAN}Currently active mods in $CONFIG_FILE:${RESET}"
+        current_mods=$(jq -r '.[] | .modId' "$TEMP_MODS" 2>/dev/null)
+        active_count=0
+        if [ -n "$current_mods" ]; then
+            i=1
+            while IFS= read -r mod_id; do
+                if [ -n "${META_DATA[$mod_id]}" ]; then
+                    IFS='|' read -r name version <<< "${META_DATA[$mod_id]}"
+                else
+                    name="Unknown"
+                    version="Unknown"
+                fi
+                printf "${CYAN}%d) ID: %s, Name: %s, Version: %s${RESET}\n" "$i" "$mod_id" "$name" "$version"
+                unset "INSTALLED_MODS[$mod_id]"  # Remove from installed list to avoid duplication
+                ((i++))
+                ((active_count++))
+            done <<< "$current_mods"
+        fi
+        if [ "$active_count" -eq 0 ]; then
+            echo -e "${CYAN}None${RESET}"
+        fi
+
+        # Display installed but inactive mods
+        echo -e "${MAGENTA}Installed mods (not active in $CONFIG_FILE):${RESET}"
+        installed_count=0
+        if [ ${#INSTALLED_MODS[@]} -gt 0 ]; then
+            i=$((active_count + 1))
+            for mod_id in "${!INSTALLED_MODS[@]}"; do
+                IFS='|' read -r name version <<< "${META_DATA[$mod_id]}"
+                printf "${MAGENTA}%d) ID: %s, Name: %s, Version: %s${RESET}\n" "$i" "$mod_id" "$name" "$version"
+                ((i++))
+                ((installed_count++))
+            done
+        fi
+        if [ "$installed_count" -eq 0 ]; then
+            echo -e "${MAGENTA}None${RESET}"
+        fi
+        echo "----------------------------------------"
+
+        # Prompt user for mod management options
+        echo -e "Select mods to add from currently installed/active list separated by spaces (e.g., '1 3 5')"
+        echo -e "Type 'clear' to remove all mods from the server json"
+        echo -e "Type 'remove number/s (e.g., 'remove 1 3 5' ) to delete specific mods from server json"
+        echo -e "Type 'add modid' to manually add a Workshop mod (e.g., 'add 123456')"
+        echo -e "Or Enter to skip this step and exit mod management:"
+        current_count=$(jq -r 'length' "$TEMP_MODS")
+        read -r selections
+
+        if [ "$selections" = "clear" ]; then
+            echo -e "${GREEN}Clearing all mods...${RESET}"
+            update_json '.game.mods = []'
+            jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"  # Refresh temp file
+            read -p "Press Enter to continue..." 
+            clear
+        elif [[ "$selections" =~ ^remove[[:space:]]+(.+)$ ]]; then
+            remove_nums="${BASH_REMATCH[1]}"
+            if [ "$current_count" -eq 0 ]; then
+                echo -e "${YELLOW}No mods to remove.${RESET}"
+            else
+                # Build jq filter to remove specific mods
+                remove_filter=". | del(.["
+                first=true
+                for num in $remove_nums; do
+                    if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le "$current_count" ]; then
+                        if [ "$first" = true ]; then
+                            remove_filter="$remove_filter$((num-1))"
+                            first=false
+                        else
+                            remove_filter="$remove_filter,$((num-1))"
+                        fi
+                    fi
+                done
+                remove_filter="$remove_filter])"
+                if [ "$first" = false ]; then  # Only run if valid indices were provided
+                    jq -c "$remove_filter" "$TEMP_MODS" > "$TEMP_MODS.tmp" && mv "$TEMP_MODS.tmp" "$TEMP_MODS"
+                    echo -e "${GREEN}Selected mods removed.${RESET}"
+                    update_json '.game.mods = $mods[0]' "$TEMP_MODS"
+                    jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"
+                else
+                    echo -e "${RED}Error: No valid mod numbers specified for removal.${RESET}"
+                fi
+            fi
+            read -p "Press Enter to continue..." 
+            clear
+        elif [[ "$selections" =~ ^add[[:space:]]+(.+)$ ]]; then
+            new_modid="${BASH_REMATCH[1]}"
+            if [ -n "$new_modid" ]; then
+                jq -c --arg id "$new_modid" '. += [{"modId": $id}] | unique_by(.modId)' "$TEMP_MODS" > "$TEMP_MODS.tmp" && mv "$TEMP_MODS.tmp" "$TEMP_MODS"
+                echo -e "${GREEN}Mod $new_modid added.${RESET}"
+                update_json '.game.mods = $mods[0]' "$TEMP_MODS"
+                jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"
+            else
+                echo -e "${RED}Error: No mod ID specified. Use 'add <modid>' (e.g., 'add 123456').${RESET}"
+            fi
+            read -p "Press Enter to continue..." 
+            clear
+        elif [ -n "$selections" ]; then
+            # Add selected mods from the list
+            if [ $((active_count + installed_count)) -gt 0 ]; then
+                declare -A ALL_MODS
+                i=1
+                if [ -n "$current_mods" ]; then
+                    while IFS= read -r mod_id; do
+                        ALL_MODS["$i"]="$mod_id"
+                        ((i++))
+                    done <<< "$current_mods"
+                fi
+                for mod_id in "${!INSTALLED_MODS[@]}"; do
+                    ALL_MODS["$i"]="$mod_id"
+                    ((i++))
+                done
+
+                for num in $selections; do
+                    if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le $((active_count + installed_count)) ]; then
+                        mod_id="${ALL_MODS[$num]}"
+                        jq -c --arg id "$mod_id" '. += [{"modId": $id}] | unique_by(.modId)' "$TEMP_MODS" > "$TEMP_MODS.tmp" && mv "$TEMP_MODS.tmp" "$TEMP_MODS"
+                    fi
+                done
+                update_json '.game.mods = $mods[0]' "$TEMP_MODS"
+                jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"
+            else
+                echo -e "${RED}Error: No mods available to select from.${RESET}"
+            fi
+            read -p "Press Enter to continue..." 
+            clear
+        else
+            break  # Empty input exits the loop
+        fi
+
+        # Ask if user wants to continue managing mods
+        echo
+        read -p "Continue managing mods? (y/N): " CONTINUE
+        if [[ ! "$CONTINUE" =~ ^[Yy]$ ]]; then
+            break
+        fi
+        clear
+    done
+
+    rm -f "$TEMP_MODS"  # Clean up temporary file
 }
 
-# Function to show help and about
+# Display help and about information
 show_help_about() {
     echo "About:"
-    echo "This script is used for administering Arma Reforger game servers."
+    echo "This script is used for administering an Arma Reforger server installed at $HOME/arma."
     echo "Licensed under the MIT License. See https://opensource.org/licenses/MIT for details."
-    echo "Current server JSON: $CONFIG_FILE"
-    echo "Settings saved in: $SETTINGS_FILE"
+    echo "Server JSON: $CONFIG_FILE"
+    echo "Addons directory: $ADDONS_DIR"
     echo
     echo "Help - Installing Dependencies:"
     echo
-    echo "jq: JSON processor (optional, but required for JSON editing/viewing)"
+    echo "jq: JSON processor (required for configuration)"
     echo "  Debian/Ubuntu: sudo apt install jq"
     echo "  - Why: jq is used to parse and modify JSON configuration files for your server."
-    echo "  - Without jq, you can still manage the service, list players, and create templates."
     echo
     echo "steamcmd: Steam command-line tool (required for server install)"
     echo "  See: https://developer.valvesoftware.com/wiki/SteamCMD for more details."
@@ -376,126 +527,178 @@ show_help_about() {
     echo "       sudo apt update"
     echo "       sudo apt install steamcmd"
     echo
-    echo "Manual Server Installation Files:"
-    echo "Template files (install.sh.template, steam.txt.template, start.sh.template, server.json.template) can be created via 'Create Template Files' in $TEMPLATE_DIR."
-    echo "To use them:"
+    echo "Server Installation:"
     echo "1. Install steamcmd (see above)."
-    echo "2. Move the files to your desired server directory and remove the .template extension (e.g., ~/arma):"
-    echo "   cp $TEMPLATE_DIR/install.sh.template $TEMPLATE_DIR/steam.txt.template $TEMPLATE_DIR/start.sh.template $TEMPLATE_DIR/server.json.template ~/arma"
-    echo "   mv ~/arma/install.sh.template ~/arma/install.sh"
-    echo "   mv ~/arma/steam.txt.template ~/arma/steam.txt"
-    echo "   mv ~/arma/start.sh.template ~/arma/start.sh"
-    echo "   mv ~/arma/server.json.template ~/arma/server.json"
-    echo "3. Make scripts executable:"
-    echo "   chmod +x ~/arma/install.sh ~/arma/start.sh"
-    echo "4. Run install.sh to download the server files:"
-    echo "   ~/arma/install.sh"
-    echo "5. Edit start.sh and server.json as needed (e.g., update paths, IP, ports)."
-    echo "6. Run start.sh to launch the server:"
-    echo "   ~/arma/start.sh"
+    echo "2. Create template files using 'Create Template Files'."
+    echo "3. Create the Arma server directory:"
+    echo "   mkdir -p $HOME/arma"
+    echo "4. Move templates to $HOME/arma and remove .template extension (excludes arma.service.tpl):"
+    echo "   cp $TEMPLATE_DIR/*.template $HOME/arma"
+    echo "   mv $HOME/arma/*.template $HOME/arma/*"
+    echo "5. Make scripts executable:"
+    echo "   chmod +x $HOME/arma/install.sh $HOME/arma/start.sh"
+    echo "6. Run install.sh to download server files:"
+    echo "   $HOME/arma/install.sh"
+    echo "7. Edit $HOME/arma/server.json (IP, ports, etc.) as needed."
+    echo "8. Start the server:"
+    echo "   $HOME/arma/start.sh"
     echo
-    echo "Service Template Setup:"
-    echo "A template file, arma.service.template, can be created via 'Manage Service' -> 'Create Service Template' in $TEMPLATE_DIR."
-    echo "To use it:"
-    echo "1. Edit $TEMPLATE_FILE:"
-    echo "   - Replace '/path/to/your/start_script.sh' with the full path to your server start script (e.g., /home/$USER/arma/start.sh)."
-    echo "   - Replace '/path/to/your/server_directory' with the directory containing ArmaReforgerServer (e.g., /home/$USER/arma)."
-    echo "2. Move and rename the file:"
+    echo "Service Setup:"
+    echo "1. Create template files via 'Create Template Files' (includes arma.service.tpl)."
+    echo "2. Move the service file to your user systemd directory:"
     echo "   mkdir -p ~/.config/systemd/user"
-    echo "   cp $TEMPLATE_FILE ~/.config/systemd/user/arma.service"
-    echo "3. Enable the service:"
+    echo "   cp $TEMPLATE_DIR/arma.service.tpl ~/.config/systemd/user/arma.service"
+    echo "3. Enable and start:"
     echo "   systemctl --user daemon-reload"
     echo "   systemctl --user enable arma.service"
+    echo "   systemctl --user start arma.service"
     echo "4. (Optional) Enable lingering:"
     echo "   sudo loginctl enable-linger $USER"
-    echo "   - Keeps services running after logout and starts them at system boot without login."
-    echo "5. Start the service:"
-    echo "   systemctl --user start arma.service"
-    echo "This sets up a user service that auto-restarts and runs at boot if lingering is enabled."
-    read -p "Press Enter to continue..."
+    read -p "Press Enter to continue..." 
+    clear
 }
 
-# Main loop
+# Main loop for the script
 while true; do
     CURRENT_NAME=$(get_json_value ".game.name")
     echo "Arma Server Config (Name: $CURRENT_NAME)"
     echo "Options:"
     echo "  1) Help/About"
     echo "  2) Create Template Files"
-    echo "  3) Search for Server JSON"
-    echo "  4) Configure Server"
-    echo "  5) Manage Service"
-    echo "  6) List Players"
-    echo "  7) Exit"
-    read -p "Enter your choice (1-7): " CHOICE
+    echo "  3) Configure Server"
+    echo "  4) Manage Service"
+    echo "  5) Exit"
+    read -p "Enter your choice (1-5): " CHOICE
 
     case $CHOICE in
-        1) # Help/About
+        1) # Display help and about info
             show_help_about
             ;;
-        2) # Create Template Files
+        2) # Create template files for server setup
             create_template_files
             ;;
-        3) # Search for Server JSON
-            search_configs
-            ;;
-        4) # Configure Server
+        3) # Configure server settings
+            clear
             while true; do
                 echo "Configure Server Options:"
-                echo "  1) Set Server Name"
-                echo "  2) Set Game Password"
-                echo "  3) Clear Game Password"
-                echo "  4) Set Admin Password"
-                echo "  5) Set Scenario"
-                echo "  6) Set Max Players"
-                echo "  7) Set Server Max View Distance (Default 1600)"
-                echo "  8) Set Server Min Grass Distance (Default 0)"
-                echo "  9) Set Network View Distance (Default 1500)"
-                echo "  10) Set Disable 3rd Person"
-                echo "  11) Set Public IP Address"
-                echo "  12) Review Server Config"
-                echo "  13) Back"
-                read -p "Enter configuration option (1-13): " CONFIGURE_ACTION
+                # Network settings (matches server.json top-level)
+                echo "  Network Settings:"
+                echo "    1) Set Public IP Address"
+                echo "    2) Set Public Port (Default 2001)"
+                echo "-----------"
+                # Game settings (matches server.json "game" section)
+                echo "  Game Settings:"
+                echo "    3) Set Server Name"
+                echo "    4) Set Game Password"
+                echo "    5) Set Admin Password"
+                echo "    6) Set Scenario"
+                echo "    7) Set Max Players"
+                echo "    8) Set Crossplay Platforms"
+                echo "-----------"
+                # Game properties (matches server.json "game.gameProperties")
+                echo "  Game Properties:"
+                echo "    9) Set Server Max View Distance (Default 1600)"
+                echo "    10) Set Server Min Grass Distance (Default 0)"
+                echo "    11) Set Network View Distance (Default 1500)"
+                echo "    12) Set Disable 3rd Person"
+                echo "-----------"
+                # Mods (matches server.json "game.mods")
+                echo "  Mods:"
+                echo "    13) Manage Mods"
+                echo "-----------"
+                # Review and exit
+                echo "  Review:"
+                echo "    14) Review Server Config"
+                echo "    15) Back"
+                read -p "Enter configuration option (1-15): " CONFIGURE_ACTION
                 case $CONFIGURE_ACTION in
-                    1) # Set Server Name
+                    1) # Set Public IP Address (publicAddress)
+                        CURRENT_IP=$(get_json_value ".publicAddress")
+                        echo "Current public IP address: $CURRENT_IP"
+                        if [[ -n "$BASH_VERSION" && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                            read -e -p "Enter new public IP address: " -i "$CURRENT_IP" PUBLIC_IP
+                        else
+                            echo "Enter new public IP address (backspace to edit):"
+                            read -p "[$CURRENT_IP]: " PUBLIC_IP
+                            [ -z "$PUBLIC_IP" ] && PUBLIC_IP="$CURRENT_IP"
+                        fi
+                        if validate_ip "$PUBLIC_IP"; then
+                            update_json ".publicAddress = \"$PUBLIC_IP\""
+                        else
+                            echo -e "${RED}Error: Invalid IP address format. Use xxx.xxx.xxx.xxx.${RESET}"
+                        fi
+                        read -p "Press Enter to continue..." 
+                        clear
+                        ;;
+                    2) # Set Public Port (publicPort)
+                        CURRENT_PUBLIC_PORT=$(get_json_value ".publicPort")
+                        echo "Current public port: $CURRENT_PUBLIC_PORT"
+                        if [[ -n "$BASH_VERSION" && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                            read -e -p "Enter new public port (default 2001): " -i "$CURRENT_PUBLIC_PORT" PUBLIC_PORT
+                        else
+                            echo "Enter new public port (default 2001, backspace to edit):"
+                            read -p "[$CURRENT_PUBLIC_PORT]: " PUBLIC_PORT
+                            [ -z "$PUBLIC_PORT" ] && PUBLIC_PORT="$CURRENT_PUBLIC_PORT"
+                        fi
+                        if [[ "$PUBLIC_PORT" =~ ^[0-9]+$ ]] && [ "$PUBLIC_PORT" -ge 1024 ] && [ "$PUBLIC_PORT" -le 65535 ]; then
+                            update_json ".publicPort = $PUBLIC_PORT"
+                        else
+                            echo -e "${RED}Error: Public port must be a number between 1024 and 65535.${RESET}"
+                        fi
+                        read -p "Press Enter to continue..." 
+                        clear
+                        ;;
+                    3) # Set Server Name (game.name)
                         CURRENT_NAME=$(get_json_value ".game.name")
                         echo "Current server name: $CURRENT_NAME"
-                        read -p "Enter new server name: " NAME
+                        if [[ -n "$BASH_VERSION" && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                            read -e -p "Enter new server name: " -i "$CURRENT_NAME" NAME
+                        else
+                            echo "Enter new server name (backspace to edit):"
+                            read -p "[$CURRENT_NAME]: " NAME
+                            [ -z "$NAME" ] && NAME="$CURRENT_NAME"
+                        fi
                         if [ -z "$NAME" ]; then
-                            echo -e "${YELLOW}Error: Server name cannot be empty.${RESET}"
+                            echo -e "${RED}Error: Server name cannot be empty.${RESET}"
                         else
                             update_json ".game.name = \"$NAME\""
                         fi
+                        read -p "Press Enter to continue..." 
+                        clear
                         ;;
-                    2) # Set Game Password
+                    4) # Set Game Password (game.password)
                         CURRENT_PASSWORD=$(get_json_value ".game.password")
                         echo "Current game password: $CURRENT_PASSWORD"
-                        read -p "Enter new game password: " PASSWORD
-                        if [ -n "$PASSWORD" ]; then
-                            update_json ".game.password = \"$PASSWORD\""
+                        if [[ -n "$BASH_VERSION" && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                            read -e -p "Enter new game password (empty to clear): " -i "$CURRENT_PASSWORD" PASSWORD
                         else
-                            echo -e "${YELLOW}Password not changed. Use 'Clear Game Password' to remove it.${RESET}"
+                            echo "Enter new game password (empty to clear, backspace to edit):"
+                            read -p "[$CURRENT_PASSWORD]: " PASSWORD
+                            [ -z "$PASSWORD" ] && PASSWORD="$CURRENT_PASSWORD"
                         fi
+                        update_json ".game.password = \"$PASSWORD\""
+                        read -p "Press Enter to continue..." 
+                        clear
                         ;;
-                    3) # Clear Game Password
-                        CURRENT_PASSWORD=$(get_json_value ".game.password")
-                        echo "Current game password: $CURRENT_PASSWORD"
-                        read -p "Are you sure you want to clear the game password? (y/N): " CONFIRM
-                        if [[ "$CONFIRM" =~ ^[Yy]$ ]]; then
-                            update_json '.game.password = ""'
-                        fi
-                        ;;
-                    4) # Set Admin Password
+                    5) # Set Admin Password (game.passwordAdmin)
                         CURRENT_ADMIN_PASSWORD=$(get_json_value ".game.passwordAdmin")
                         echo "Current admin password: $CURRENT_ADMIN_PASSWORD"
-                        read -p "Enter new admin password: " ADMIN_PASSWORD
+                        if [[ -n "$BASH_VERSION" && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                            read -e -p "Enter new admin password: " -i "$CURRENT_ADMIN_PASSWORD" ADMIN_PASSWORD
+                        else
+                            echo "Enter new admin password (backspace to edit):"
+                            read -p "[$CURRENT_ADMIN_PASSWORD]: " ADMIN_PASSWORD
+                            [ -z "$ADMIN_PASSWORD" ] && ADMIN_PASSWORD="$CURRENT_ADMIN_PASSWORD"
+                        fi
                         if [ -n "$ADMIN_PASSWORD" ]; then
                             update_json ".game.passwordAdmin = \"$ADMIN_PASSWORD\""
                         else
-                            echo -e "${YELLOW}Admin password cannot be empty.${RESET}"
+                            echo -e "${RED}Error: Admin password cannot be empty.${RESET}"
                         fi
+                        read -p "Press Enter to continue..." 
+                        clear
                         ;;
-                    5) # Set Scenario
+                    6) # Set Scenario (game.scenarioId)
                         list_scenarios
                         CURRENT_SCENARIO=$(get_json_value ".game.scenarioId")
                         for i in "${!SCENARIOS[@]}"; do
@@ -505,54 +708,118 @@ while true; do
                             fi
                         done
                         read -p "Enter scenario number: " SCENARIO_NUM
-                        if [ "$SCENARIO_NUM" -ge 1 ] && [ "$SCENARIO_NUM" -le "${#SCENARIOS[@]}" ]; then
+                        if [ "$SCENARIO_NUM" -ge 1 ] && [ "$SCENARIO_NUM" -le "${#SCENARIOS[@]}" ] 2>/dev/null; then
                             SCENARIO_ID=$(echo "${SCENARIOS[$((SCENARIO_NUM-1))]}" | cut -d'|' -f1)
                             update_json ".game.scenarioId = \"$SCENARIO_ID\""
                         else
-                            echo -e "${YELLOW}Invalid scenario number.${RESET}"
+                            echo -e "${RED}Error: Invalid scenario number. Must be between 1 and ${#SCENARIOS[@]}.${RESET}"
                         fi
+                        read -p "Press Enter to continue..." 
+                        clear
                         ;;
-                    6) # Set Max Players (Range: 2-128, No Default Displayed)
+                    7) # Set Max Players (game.maxPlayers)
                         CURRENT_MAX=$(get_json_value ".game.maxPlayers")
                         echo "Current max players: $CURRENT_MAX"
-                        read -p "Enter new max players: " MAX_PLAYERS
+                        if [[ -n "$BASH_VERSION" && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                            read -e -p "Enter new max players: " -i "$CURRENT_MAX" MAX_PLAYERS
+                        else
+                            echo "Enter new max players (backspace to edit):"
+                            read -p "[$CURRENT_MAX]: " MAX_PLAYERS
+                            [ -z "$MAX_PLAYERS" ] && MAX_PLAYERS="$CURRENT_MAX"
+                        fi
                         if [[ "$MAX_PLAYERS" =~ ^[0-9]+$ ]] && [ "$MAX_PLAYERS" -ge 2 ] && [ "$MAX_PLAYERS" -le 128 ]; then
                             update_json ".game.maxPlayers = $MAX_PLAYERS"
                         else
-                            echo -e "${YELLOW}Warning: Max players must be a number between 2 and 128.${RESET}"
+                            echo -e "${RED}Error: Max players must be a number between 2 and 128.${RESET}"
                         fi
+                        read -p "Press Enter to continue..." 
+                        clear
                         ;;
-                    7) # Set Server Max View Distance (Range: 500-10000, Default 1600)
+                    8) # Set Crossplay Platforms (game.supportedPlatforms, game.crossPlatform)
+                        CURRENT_PLATFORMS=$(get_json_value ".game.supportedPlatforms")
+                        echo "Current crossplay platforms: $CURRENT_PLATFORMS"
+                        echo "Select crossplay option:"
+                        echo "  1) All platforms (PC, Xbox, PS5) - No mods allowed"
+                        echo "  2) PC and Xbox - Mods allowed"
+                        echo "  3) PC only - Mods allowed"
+                        read -p "Enter choice (1-3): " CROSSPLAY_CHOICE
+                        case $CROSSPLAY_CHOICE in
+                            1)
+                                update_json '.game.supportedPlatforms = ["PLATFORM_PC", "PLATFORM_XBL", "PLATFORM_PSN"] | .game.crossPlatform = true'
+                                echo -e "${YELLOW}Note: PS5 does not support mods. Ensure no mods are active for PS5 crossplay.${RESET}"
+                                ;;
+                            2)
+                                update_json '.game.supportedPlatforms = ["PLATFORM_PC", "PLATFORM_XBL"] | .game.crossPlatform = true'
+                                echo -e "${GREEN}Set to PC and Xbox crossplay. Mods are allowed.${RESET}"
+                                echo -e "${YELLOW}Note: PSN players won't be able to join.${RESET}"
+                                ;;
+                            3)
+                                update_json '.game.supportedPlatforms = ["PLATFORM_PC"] | .game.crossPlatform = false'
+                                echo -e "${GREEN}Set to PC only. Mods are allowed.${RESET}"
+                                echo -e "${YELLOW}Note: XBL and PSN players won't be able to join.${RESET}"
+                                ;;
+                            *)
+                                echo -e "${RED}Error: Invalid choice. Must be 1, 2, or 3.${RESET}"
+                                ;;
+                        esac
+                        read -p "Press Enter to continue..." 
+                        clear
+                        ;;
+                    9) # Set Server Max View Distance (game.gameProperties.serverMaxViewDistance)
                         CURRENT_SERVER_VIEW=$(get_json_value ".game.gameProperties.serverMaxViewDistance")
                         echo "Current server max view distance: $CURRENT_SERVER_VIEW"
-                        read -p "Enter new server max view distance (default 1600): " SERVER_VIEW
+                        if [[ -n "$BASH_VERSION" && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                            read -e -p "Enter new server max view distance (default 1600): " -i "$CURRENT_SERVER_VIEW" SERVER_VIEW
+                        else
+                            echo "Enter new server max view distance (default 1600, backspace to edit):"
+                            read -p "[$CURRENT_SERVER_VIEW]: " SERVER_VIEW
+                            [ -z "$SERVER_VIEW" ] && SERVER_VIEW="$CURRENT_SERVER_VIEW"
+                        fi
                         if [[ "$SERVER_VIEW" =~ ^[0-9]+$ ]] && [ "$SERVER_VIEW" -ge 500 ] && [ "$SERVER_VIEW" -le 10000 ]; then
                             update_json ".game.gameProperties.serverMaxViewDistance = $SERVER_VIEW"
                         else
-                            echo -e "${YELLOW}Warning: Server max view distance must be a number between 500 and 10000.${RESET}"
+                            echo -e "${RED}Error: Server max view distance must be a number between 500 and 10000.${RESET}"
                         fi
+                        read -p "Press Enter to continue..." 
+                        clear
                         ;;
-                    8) # Set Server Min Grass Distance (Range: 0-150, Default 0)
+                    10) # Set Server Min Grass Distance (game.gameProperties.serverMinGrassDistance)
                         CURRENT_GRASS_VIEW=$(get_json_value ".game.gameProperties.serverMinGrassDistance")
                         echo "Current server min grass distance: $CURRENT_GRASS_VIEW"
-                        read -p "Enter new server min grass distance (default 0): " GRASS_VIEW
+                        if [[ -n "$BASH_VERSION" && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                            read -e -p "Enter new server min grass distance (default 0): " -i "$CURRENT_GRASS_VIEW" GRASS_VIEW
+                        else
+                            echo "Enter new server min grass distance (default 0, backspace to edit):"
+                            read -p "[$CURRENT_GRASS_VIEW]: " GRASS_VIEW
+                            [ -z "$GRASS_VIEW" ] && GRASS_VIEW="$CURRENT_GRASS_VIEW"
+                        fi
                         if [[ "$GRASS_VIEW" =~ ^[0-9]+$ ]] && [ "$GRASS_VIEW" -ge 0 ] && [ "$GRASS_VIEW" -le 150 ]; then
                             update_json ".game.gameProperties.serverMinGrassDistance = $GRASS_VIEW"
                         else
-                            echo -e "${YELLOW}Warning: Server min grass distance must be a number between 0 and 150.${RESET}"
+                            echo -e "${RED}Error: Server min grass distance must be a number between 0 and 150.${RESET}"
                         fi
+                        read -p "Press Enter to continue..." 
+                        clear
                         ;;
-                    9) # Set Network View Distance (Range: 500-5000, Default 1500)
+                    11) # Set Network View Distance (game.gameProperties.networkViewDistance)
                         CURRENT_NETWORK_VIEW=$(get_json_value ".game.gameProperties.networkViewDistance")
                         echo "Current network view distance: $CURRENT_NETWORK_VIEW"
-                        read -p "Enter new network view distance (default 1500): " NETWORK_VIEW
+                        if [[ -n "$BASH_VERSION" && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+                            read -e -p "Enter new network view distance (default 1500): " -i "$CURRENT_NETWORK_VIEW" NETWORK_VIEW
+                        else
+                            echo "Enter new network view distance (default 1500, backspace to edit):"
+                            read -p "[$CURRENT_NETWORK_VIEW]: " NETWORK_VIEW
+                            [ -z "$NETWORK_VIEW" ] && NETWORK_VIEW="$CURRENT_NETWORK_VIEW"
+                        fi
                         if [[ "$NETWORK_VIEW" =~ ^[0-9]+$ ]] && [ "$NETWORK_VIEW" -ge 500 ] && [ "$NETWORK_VIEW" -le 5000 ]; then
                             update_json ".game.gameProperties.networkViewDistance = $NETWORK_VIEW"
                         else
-                            echo -e "${YELLOW}Warning: Network view distance must be a number between 500 and 5000.${RESET}"
+                            echo -e "${RED}Error: Network view distance must be a number between 500 and 5000.${RESET}"
                         fi
+                        read -p "Press Enter to continue..." 
+                        clear
                         ;;
-                    10) # Set Disable 3rd Person
+                    12) # Set Disable 3rd Person (game.gameProperties.disableThirdPerson)
                         CURRENT_DISABLE_3RD=$(get_json_value ".game.gameProperties.disableThirdPerson")
                         echo "Current disable third person: $CURRENT_DISABLE_3RD"
                         read -p "Disable third person view? (y/N): " DISABLE_3RD
@@ -561,69 +828,73 @@ while true; do
                         else
                             update_json ".game.gameProperties.disableThirdPerson = false"
                         fi
+                        read -p "Press Enter to continue..." 
+                        clear
                         ;;
-                    11) # Set Public IP Address
-                        CURRENT_IP=$(get_json_value ".publicAddress")
-                        echo "Current public IP address: $CURRENT_IP"
-                        read -p "Enter new public IP address: " PUBLIC_IP
-                        if validate_ip "$PUBLIC_IP"; then
-                            update_json ".publicAddress = \"$PUBLIC_IP\""
-                            update_json ".a2s.address = \"$PUBLIC_IP\""
-                        else
-                            echo -e "${YELLOW}Error: Invalid IP address format.${RESET}"
-                        fi
+                    13) # Manage Mods (game.mods)
+                        manage_mods
+                        clear
                         ;;
-                    12) # Review Server Config
+                    14) # Review Server Config
                         if ! command -v jq &> /dev/null; then
-                            echo -e "${YELLOW}Error: jq is not installed. Cannot view JSON configuration.${RESET}"
+                            echo -e "${RED}Error: jq is not installed. Cannot view JSON configuration.${RESET}"
                         elif jq . "$CONFIG_FILE" 2>/dev/null; then
-                            read -p "Press Enter to continue..."
+                            echo "Server configuration displayed above."
                         else
-                            echo -e "${YELLOW}Error: Unable to read server JSON at $CONFIG_FILE${RESET}"
+                            echo -e "${RED}Error: Unable to read server JSON at $CONFIG_FILE${RESET}"
                         fi
+                        read -p "Press Enter to continue..." 
+                        clear
                         ;;
-                    13) # Back
+                    15) # Back to main menu
                         break
                         ;;
-                    *) echo -e "${YELLOW}Invalid configuration option.${RESET}" ;;
+                    *) 
+                        echo -e "${RED}Error: Invalid configuration option. Must be 1-15.${RESET}"
+                        read -p "Press Enter to continue..." 
+                        clear
+                        ;;
                 esac
-                echo
             done
+            clear
             ;;
-        5) # Manage Service
+        4) # Manage the server service
+            clear
             while true; do
                 echo "Service Options:"
                 echo "  1) Start"
                 echo "  2) Stop"
                 echo "  3) Restart"
                 echo "  4) Status"
-                echo "  5) Create Service Template"
-                echo "  6) Enable Lingering"
-                echo "  7) Back"
-                read -p "Enter service action (1-7): " SERVICE_ACTION
+                echo "  5) Enable Lingering"
+                echo "  6) Back"
+                read -p "Enter service action (1-6): " SERVICE_ACTION
                 case $SERVICE_ACTION in
                     1) manage_service "start" ;;
                     2) manage_service "stop" ;;
                     3) manage_service "restart" ;;
                     4) manage_service "status" ;;
-                    5) manage_service "create_template" ;;
-                    6) enable_lingering ;;
-                    7) break ;;
-                    *) echo -e "${YELLOW}Invalid service action.${RESET}" ;;
+                    5) enable_lingering ;;
+                    6) break ;;
+                    *) 
+                        echo -e "${RED}Error: Invalid service action. Must be 1-6.${RESET}"
+                        read -p "Press Enter to continue..." 
+                        clear
+                        ;;
                 esac
-                echo
             done
+            clear
             ;;
-        6) # List Players
-            list_players
-            read -p "Press Enter to continue..."
-            ;;
-        7) # Exit
+        5) # Exit the script
             echo -e "${GREEN}Exiting...${RESET}"
+            read -p "Press Enter to continue..." 
+            clear
             exit 0
             ;;
-        *) echo -e "${YELLOW}Invalid choice. Please enter a number between 1 and 7.${RESET}" ;;
+        *) 
+            echo -e "${RED}Error: Invalid choice. Please enter a number between 1 and 5.${RESET}"
+            read -p "Press Enter to continue..." 
+            clear
+            ;;
     esac
-    echo
 done
-
