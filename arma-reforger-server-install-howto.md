@@ -5,17 +5,16 @@ date: March 19, 2025
 ---
 
 # Intro
-`This guide is geared towards folks who want to self-host an Arma Reforger Game server on Linux.`
-In this little guide I'm going to describe how I installed my own self-hosted dedicated Linux (Debian Based) ArmaReforger Server. Mine is currently set up on a little BeeLink S12 Pro: 16gb Ram, 500gb ssd, running headless next to my PS5. This guide should work with most .deb based systems like Debian, Linux Mint, and Ubuntu. I use Linux because I haven't owned or run Windows PCs for many, many years.
+This guide is geared towards folks who want to self-host an Arma Reforger Game server on Linux. In this guide I'm going to describe how I installed my own self-hosted dedicated Linux (Debian Based) ArmaReforger Server. Mine is currently set up on a little BeeLink SER5 Pro AMD Ryzen 7 5850U, 32GB Ram, 500GB SSD, running headless next to my PS5. This guide should work with most .deb based systems like Debian, Linux Mint, and Ubuntu.
 
 # What you will need
 
-* A PC running some type of Debian based Linux OS (Maybe a VM on Windows will work, haven't tried)
+* A PC Debian based Linux OS (Maybe a VM on Windows will work, haven't tried)
 * Static IP address for the server (Local Network i.e. 192.168.1.69)
 * Steamcmd
 * Some Type of basic text editor: vim, nano, note pad, gedit, etc
 
-I do everything via ssh, so these will all be console command instructions from here on out.
+I do everything via ssh terminal, so these will all be console command instructions from here on out.
 
 # Getting Started
 
@@ -98,15 +97,14 @@ nano start.sh
 # Install or Update game
 $HOME/arma/install.sh
 # Start server
-$HOME/arma/ArmaReforgerServer -config $HOME/arma/server.json -profile $HOME/arma -maxFPS 60
+$HOME/arma/ArmaReforgerServer -config=$HOME/arma/server.json -profile=$HOME/arma/profile -maxFPS 60
 ```
 
 You will notice I use the $HOME environmental variable in these examples. You can see what your path would be in a terminal by typing `echo $HOME`. It should come back with something like `/home/<username>`. As long as you are starting everything as your user, $HOME should work in the scripts. Otherwise use absolute paths like `/home/<username>/arma`.
 
-
 # Setting up the Server
 
-Now we will create a server configuration file. This will be the configuration for how the server will run. The following is basically how I have mine set up. There are a few more settings that can be used, but these are the basics of a JSON config file. There are more examples floating around on the Official wiki pages, Discord, websites, etc.
+Now we will create a server configuration file. This will be the configuration for how the server will run. There are a few more settings that can be used, but these are the basics of a JSON config file. There are more examples floating around on the Official wiki pages, Discord, websites, etc.
 
 Create a file named `server.json`
 ```
@@ -114,45 +112,52 @@ nano server.json
 ```
 ```json
 {
-    "publicAddress": "YOUR_PUBLIC_IP",
-    "publicPort": 2001,
-    "a2s": {
-        "address": "YOUR_PUBLIC_IP",
-        "port": 17777
-    },
-
-    "game": {
-        "name": "YOUR_SERVER_NAME",
-        "password": "",
-        "passwordAdmin": "SET_ADMIN_PASSWORD_HERE",
-        "admins" : [],
-        "scenarioId": "{DAA03C6E6099D50F}Missions/24_CombatOps.conf",
-        "maxPlayers": 6,
-        "visible": true,
-        "crossPlatform": true,
-		"supportedPlatforms": ["PLATFORM_PC","PLATFORM_XBL","PLATFORM_PSN"],
-        "gameProperties": {
-            "serverMaxViewDistance": 1500,
-            "serverMinGrassDistance": 50,
-            "networkViewDistance": 1000,
-            "disableThirdPerson": false,
-            "fastValidation": true,
-            "battlEye": true,
-            "VONDisableUI": false,
-            "VONDisableDirectSpeechUI": false,
-            "VONCanTransmitCrossFaction": false
-        },
-        "mods": []
-    },
-    "operating": {
-        "lobbyPlayerSynchronise": true,
-        "joinQueue" : { "maxSize" : 2 },
-        "disableNavmeshStreaming": []
-    }
+   "publicAddress":"YOUR_PUBLIC_IP",
+   "publicPort":2001,
+   "game":{
+      "name":"YOUR_SERVER_NAME",
+      "password":"",
+      "passwordAdmin":"SET_ADMIN_PASSWORD_HERE",
+      "admins":[
+         
+      ],
+      "scenarioId":"{DAA03C6E6099D50F}Missions/24_CombatOps.conf",
+      "maxPlayers":6,
+      "visible":true,
+      "crossPlatform":true,
+      "supportedPlatforms":[
+         "PLATFORM_PC",
+         "PLATFORM_XBL",
+         "PLATFORM_PSN"
+      ],
+      "gameProperties":{
+         "serverMaxViewDistance":1500,
+         "serverMinGrassDistance":50,
+         "networkViewDistance":1000,
+         "disableThirdPerson":false,
+         "fastValidation":true,
+         "battlEye":true,
+         "VONDisableUI":false,
+         "VONDisableDirectSpeechUI":false,
+         "VONCanTransmitCrossFaction":false
+      },
+      "mods":[
+         
+      ]
+   },
+   "operating":{
+      "lobbyPlayerSynchronise":true,
+      "joinQueue":{
+         "maxSize":2
+      },
+      "disableNavmeshStreaming":[
+         
+      ]
+   }
 }
 ```
 
-You will need to put your public IP in the `publicAddress` field. This will be the IP address that players will connect to from the outside world. On a computer with a browser you can check one of the "Whats my IP" websites to find it. You will have to look at your router instructions on how to forward the standard ports (UDP `2001` and `17777`) to the game servers IP on your internal network. This is where having a static IP (example: 192.168.1.69) for your internal private network assigned to the game server PC is needed. There are various ways to configure a static IP, on Debian 12 if you are running a bare install of the OS with no graphical desktop you can do this in `/etc/network/interfaces`. Ubuntu usees `netplan`. Or if you run a GUI desktop, configure your network card for a static IP via the Network Settings/Connections application for your desktop.
+You will need to put your public IP in the `publicAddress` field. This will be the IP address that players will connect to from the outside world. On a computer with a browser you can check one of the "Whats my IP" websites to find it. You will have to look at your router instructions on how to forward the ports (UDP `2001`) to the game servers IP on your internal network. This is where having a static IP (example: 192.168.1.69) for your internal private network assigned to the game server PC is needed. There are various ways to configure a static IP, on Debian 12 if you are running a bare install of the OS with no graphical desktop you can do this in `/etc/network/interfaces`. Ubuntu uses `netplan` or `NetworkManager`. Or if you run a GUI desktop, configure your network card for a static IP via the Network Settings/Connections application for your desktop.
 
 # Picking a Scenario from the Official List
 
@@ -179,7 +184,6 @@ Official scenarios (17 entries)
 {6EA2E454519E5869}Missions/CAH_Military_Base.conf (Capture & Hold: Camp Blake)
 {2B4183DF23E88249}Missions/CAH_Morton.conf (Capture & Hold: Morton)
 ```
-
 # Firing it up
 
 Now we need to install everything.
@@ -188,29 +192,25 @@ Make the `install.sh` and `start.sh` scripts executable
 chmod 755 start.sh
 chmod 755 install.sh
 ```
-
 It might be a good idea to run just the `install.sh` script first to see if everything goes well.
 ```
 cd $HOME/arma
 ./install.sh
 ```
-This will log into steam, download, and validate the Arma Reforger Server files. If everything looks good, we can run the `startserver.sh` script.
+This will log into steam, download, and validate the Arma Reforger Server files. If everything looks good, we can run the `start.sh` script.
 ```
 ./start.sh
 ```
-
 The script will check with steam for any updates, then spit out a bunch of text as it starts up the game server. You should be able to join it via the server list (May take a moment to show up), or you can do a direct join by starting the game and using the direct join feature (I'm on PS5, so I'm not sure what it is on PC or XBOX). You can close the server by Ctrl+c. If you can join and everything looks good, then you're done with the basic setup and running the game server, you can move on to automating the process if you wish.
 
 # Automating the Server Process
 
-You can use a program like `tmux` or `sreen` to be able to start the server then disconnect the ssh session and have it stay running when you logout. Personally I use a `systemd "--user"` service to run mine, which will also restart it if it fails for whatever reason. Here is an example of what my `arma.service` file contents look like. This will start the game server whenever the server PC itself starts using your Linux user. For a systemd `--user` level service you'll need to enable lingering for that user. Normally when a `--user` level service is started, it only stays running while that user is logged into the system. With lingering enabled, you can start the service and log out. Plus after the service has been `enabled` by the user, it will auto start after a full system reboot if lingering is enabled. For normal system wide systemd services, they are usually configured in `/etc/systemd`, but for a normal user they'll be configured in `$HOME/.config/systemd/user/`. So if these directories do not exist, then create them.
+You can use a program like `tmux` or `sreen` to be able to start the server then disconnect the ssh session and have it stay running when you logout. Personally I use a `systemd "--user"` service to run mine, which will also restart it if it fails for whatever reason. Below is an example of what my `arma.service` file contents look like and how to enable lingering. This will start the game server whenever the server PC itself starts using your Linux user. For a systemd `--user` level service you'll need to enable lingering for that user. Normally when a `--user` level service is started, it only stays running while that user is logged into the system. With lingering enabled, you can start the service and log out. Plus after the service has been `enabled` by the user, it will auto start after a full system reboot if lingering is enabled. For normal system wide systemd services, they are usually configured in `/etc/systemd`, but for a normal user they'll be configured in `$HOME/.config/systemd/user/`. So if these directories do not exist, then create them.
 ```
 mkdir -p $HOME/.config/systemd/user
 cd $HOME/.config/systemd/user
 ```
-
 We're going to create the service file that will be used to start/stop/restart the server process. It's a good idea to use absolute paths in these files so systemd doesn't freak out. And you may notice that we use the `default-target` in the `WantedBy` section. That's because by default it is the system "runlevel" `--user` services are setup to run in. In system wide services, a lot of times the `WantedBy` target is `multi-user.target`. But for normal users `systemctl --user` services are limited to `default.target`.
-
 ```
 nano arma.service
 ```
@@ -229,7 +229,6 @@ Restart=always
 [Install]
 WantedBy=default.target
 ```
-
 Ok, that should be all you need as far as a service file goes. Now we need to enable it for use and enable lingering for the user so it will stay running when they log off.
 Enable Lingering for the user (Must be a Sudoer or root for this next command)
 ```
@@ -252,15 +251,14 @@ username@localhost:~$ systemctl --user status arma.service
      Loaded: loaded (/home/<username>/.config/systemd/user/arma.service; enabled; preset: enabled)
      Active: active (running) since Fri 2025-02-14 15:00:27 MST; 5h 10min ago
 ```
-So the commands to control the game server are:
+The commands to control the game server are:
 ```
 systemctl --user start arma.service
 systemctl --user stop arma.service
 systemctl --user restart arma.service
 systemctl --user status arma.service
 ```
-
-So you can test everything out by rebooting the whole PC and seeing if the game server starts automatically, and maybe logging in to your game server as Admin and issuing the `#shutdown` command and seeing if it auto restarts. I also didn't go into using `cron` to automate the server restarts, even though it might be easier. I kind of like the flexibility of `systemd` services. You may also want to read up on `journalctl` for reading the server log files: `journalctl --user -u arma.service`.
+You can test everything out by rebooting the whole PC and seeing if the game server starts automatically, and maybe logging in to your game server as Admin and issuing the `#shutdown` command and seeing if it auto restarts. You may also want to read up on `journalctl` for reading the server log files: `journalctl --user -u arma.service`.
 
 This is the first time dealing with anything related to Steam, so hopefully you find this guide helpful, and that there are not too many spelling mistakes in here LOL :-)
 
