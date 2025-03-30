@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# arsc.sh (CLI-Only Version) - Version 1.2 - 2025-03-26
+# armar-sc.sh (CLI-Only Version) - Version 1.2 - 2025-03-26
 #
 # Copyright (c) 2025 Hanzerik307
 #
