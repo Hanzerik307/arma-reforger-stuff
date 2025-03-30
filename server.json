@@ -1,10 +1,6 @@
 {
   "publicAddress": "123.123.123.",
   "publicPort": 2001,
-  "a2s": {
-    "address": "123.123.123.123",
-    "port": 17777
-  },
   "game": {
     "name": "Wyoming 307",
     "password": "GamePassword",
