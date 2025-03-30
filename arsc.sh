@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# armaserverconfig.sh (CLI-Only Version) - Version 1.2 - 2025-03-26
+# arsc.sh (CLI-Only Version) - Version 1.2 - 2025-03-26
 #
 # Copyright (c) 2025 Hanzerik307
 #
@@ -25,7 +25,7 @@
 # Fixed paths for server files and templates
 CONFIG_FILE="$HOME/arma/server.json"       # Main server configuration file
 ADDONS_DIR="$HOME/arma/profile/addons"     # Directory where mods are stored
-TEMPLATE_DIR="$HOME/.armaserverconfig"     # Directory for template files
+TEMPLATE_DIR="$HOME/.arsc"     # Directory for template files
 
 # Array of predefined scenarios (format: scenarioId|description)
 SCENARIOS=(
