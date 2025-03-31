@@ -34,6 +34,8 @@ SCENARIOS=(
     "{2BBBE828037C6F4B}Missions/22_GM_Arland.conf|Game Master - Arland"
     "{C700DB41F0C546E1}Missions/23_Campaign_NorthCentral.conf|Conflict - Northern Everon"
     "{28802845ADA64D52}Missions/23_Campaign_SWCoast.conf|Conflict - Southern Everon"
+    "{94992A3D7CE4FF8A}Missions/23_Campaign_Western.conf|Conflict - Western Everon"
+    "{FDE33AFE2ED7875B}Missions/23_Campaign_Montignac.conf|Conflict - Montignac"
     "{DAA03C6E6099D50F}Missions/24_CombatOps.conf|Combat Ops - Arland"
     "{C41618FD18E9D714}Missions/23_Campaign_Arland.conf|Conflict - Arland"
     "{DFAC5FABD11F2390}Missions/26_CombatOpsEveron.conf|Combat Ops - Everon"
