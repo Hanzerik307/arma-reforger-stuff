@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# armar-sc.sh (CLI-Only Version) - Version 1.2 - 2025-03-26
+# armar-sc.sh (CLI-Only Version) - Version 1.3 - 2025-03-26
 #
 # Copyright (c) 2025 Hanzerik307
 #
@@ -344,11 +344,10 @@ manage_mods() {
             while IFS= read -r mod_id; do
                 if [ -n "${META_DATA[$mod_id]}" ]; then
                     IFS='|' read -r name version <<< "${META_DATA[$mod_id]}"
+                    printf "${CYAN}%d) ID: %s (Name: %s, Version: %s)${RESET}\n" "$i" "$mod_id" "$name" "$version"
                 else
-                    name="Unknown"
-                    version="Unknown"
+                    printf "${CYAN}%d) ID: %s${RESET}\n" "$i" "$mod_id"
                 fi
-                printf "${CYAN}%d) ID: %s, Name: %s, Version: %s${RESET}\n" "$i" "$mod_id" "$name" "$version"
                 unset "INSTALLED_MODS[$mod_id]"  # Remove from installed list to avoid duplication
                 ((i++))
                 ((active_count++))
@@ -365,7 +364,7 @@ manage_mods() {
             i=$((active_count + 1))
             for mod_id in "${!INSTALLED_MODS[@]}"; do
                 IFS='|' read -r name version <<< "${META_DATA[$mod_id]}"
-                printf "${MAGENTA}%d) ID: %s, Name: %s, Version: %s${RESET}\n" "$i" "$mod_id" "$name" "$version"
+                printf "${MAGENTA}%d) ID: %s (Name: %s, Version: %s)${RESET}\n" "$i" "$mod_id" "$name" "$version"
                 ((i++))
                 ((installed_count++))
             done
