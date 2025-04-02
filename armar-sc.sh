@@ -195,9 +195,7 @@ EOF
     "name": "Wyoming 307",
     "password": "GamePassword",
     "passwordAdmin": "AdminPassword",
-    "admins": [
-      "yourplayeridentityid"
-    ],
+    "admins": [],
     "scenarioId": "{DAA03C6E6099D50F}Missions/24_CombatOps.conf",
     "maxPlayers": 6,
     "visible": true,
