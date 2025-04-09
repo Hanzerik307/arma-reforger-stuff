@@ -125,11 +125,6 @@ nano server.json
       "maxPlayers":6,
       "visible":true,
       "crossPlatform":true,
-      "supportedPlatforms":[
-         "PLATFORM_PC",
-         "PLATFORM_XBL",
-         "PLATFORM_PSN"
-      ],
       "gameProperties":{
          "serverMaxViewDistance":1500,
          "serverMinGrassDistance":50,
