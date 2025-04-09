@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# armar-sc.sh (CLI-Only Version) - Version 1.3 - 2025-03-26
+# armar-sc.sh (CLI-Only Version) - Version 1.4 - 2025-04-09
 #
 # Copyright (c) 2025 Hanzerik307
 #
@@ -25,7 +25,7 @@
 # Fixed paths for server files and templates
 CONFIG_FILE="$HOME/arma/server.json"       # Main server configuration file
 ADDONS_DIR="$HOME/arma/profile/addons"     # Directory where mods are stored
-TEMPLATE_DIR="$HOME/.arsc"     # Directory for template files
+TEMPLATE_DIR="$HOME/.arsc"                 # Directory for template files
 
 # Array of predefined scenarios (format: scenarioId|description)
 SCENARIOS=(
@@ -200,11 +200,6 @@ EOF
     "maxPlayers": 6,
     "visible": true,
     "crossPlatform": true,
-    "supportedPlatforms": [
-      "PLATFORM_PC",
-      "PLATFORM_XBL",
-      "PLATFORM_PSN"
-    ],
     "gameProperties": {
       "serverMaxViewDistance": 1500,
       "serverMinGrassDistance": 50,
@@ -371,66 +366,70 @@ manage_mods() {
             echo -e "${MAGENTA}None${RESET}"
         fi
         echo "----------------------------------------"
+        echo "Options:"
+        echo "  add <modid> (e.g., 'add 123456' Adds a new ModId from the Workshop to the server json to be downloaded/installed)"
+        echo "  enable <numbers> (e.g., 'enable 1 3 5' Enables ModIds from downloaded/installed mods in the addons directory)"
+        echo "  disable <numbers> (e.g., 'disable 1 3 4 5' Disables selected ModIds from server json)"
+        echo "  clear (Removes all ModIds from server json)"
+        echo "  Or hit Enter to exit"
 
-        # Prompt user for mod management options
-        echo -e "Select mods to add from currently installed/active list separated by spaces (e.g., '1 3 5')"
-        echo -e "Type 'clear' to remove all mods from the server json"
-        echo -e "Type 'remove number/s (e.g., 'remove 1 3 5' ) to delete specific mods from server json"
-        echo -e "Type 'add modid' to manually add a Workshop mod (e.g., 'add 123456')"
-        echo -e "Or Enter to skip this step and exit mod management:"
-        current_count=$(jq -r 'length' "$TEMP_MODS")
-        read -r selections
+        # Prompt for option
+        read -p "Enter Option: " selections
 
-        if [ "$selections" = "clear" ]; then
+        if [ -z "$selections" ]; then
+            break  # Empty input exits the loop
+        elif [ "$selections" = "clear" ]; then
             echo -e "${GREEN}Clearing all mods...${RESET}"
             update_json '.game.mods = []'
             jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"  # Refresh temp file
-            read -p "Press Enter to continue..." 
-            clear
-        elif [[ "$selections" =~ ^remove[[:space:]]+(.+)$ ]]; then
-            remove_nums="${BASH_REMATCH[1]}"
+        elif [[ "$selections" =~ ^disable[[:space:]]+(.+)$ ]]; then
+            disable_nums="${BASH_REMATCH[1]}"
+            current_count=$(jq -r 'length' "$TEMP_MODS")
             if [ "$current_count" -eq 0 ]; then
-                echo -e "${YELLOW}No mods to remove.${RESET}"
+                echo -e "${YELLOW}No mods to disable.${RESET}"
             else
-                # Build jq filter to remove specific mods
-                remove_filter=". | del(.["
+                # Build jq filter to disable specific mods
+                disable_filter=". | del(.["
                 first=true
-                for num in $remove_nums; do
+                for num in $disable_nums; do
                     if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le "$current_count" ]; then
                         if [ "$first" = true ]; then
-                            remove_filter="$remove_filter$((num-1))"
+                            disable_filter="$disable_filter$((num-1))"
                             first=false
                         else
-                            remove_filter="$remove_filter,$((num-1))"
+                            disable_filter="$disable_filter,$((num-1))"
                         fi
                     fi
                 done
-                remove_filter="$remove_filter])"
+                disable_filter="$disable_filter])"
                 if [ "$first" = false ]; then  # Only run if valid indices were provided
-                    jq -c "$remove_filter" "$TEMP_MODS" > "$TEMP_MODS.tmp" && mv "$TEMP_MODS.tmp" "$TEMP_MODS"
-                    echo -e "${GREEN}Selected mods removed.${RESET}"
+                    jq -c "$disable_filter" "$TEMP_MODS" > "$TEMP_MODS.tmp" && mv "$TEMP_MODS.tmp" "$TEMP_MODS"
+                    echo -e "${GREEN}Selected mods disabled.${RESET}"
                     update_json '.game.mods = $mods[0]' "$TEMP_MODS"
                     jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"
                 else
-                    echo -e "${RED}Error: No valid mod numbers specified for removal.${RESET}"
+                    echo -e "${RED}Error: No valid mod numbers specified for disabling.${RESET}"
                 fi
             fi
-            read -p "Press Enter to continue..." 
-            clear
         elif [[ "$selections" =~ ^add[[:space:]]+(.+)$ ]]; then
             new_modid="${BASH_REMATCH[1]}"
             if [ -n "$new_modid" ]; then
-                jq -c --arg id "$new_modid" '. += [{"modId": $id}] | unique_by(.modId)' "$TEMP_MODS" > "$TEMP_MODS.tmp" && mv "$TEMP_MODS.tmp" "$TEMP_MODS"
-                echo -e "${GREEN}Mod $new_modid added.${RESET}"
-                update_json '.game.mods = $mods[0]' "$TEMP_MODS"
-                jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"
+                # Validate ModId: 16 characters, alphanumeric
+                if [[ "$new_modid" =~ ^[0-9A-Za-z]{16}$ ]]; then
+                    # Convert to uppercase
+                    new_modid=$(echo "$new_modid" | tr '[:lower:]' '[:upper:]')
+                    jq -c --arg id "$new_modid" '. += [{"modId": $id}] | unique_by(.modId)' "$TEMP_MODS" > "$TEMP_MODS.tmp" && mv "$TEMP_MODS.tmp" "$TEMP_MODS"
+                    echo -e "${GREEN}Mod $new_modid added.${RESET}"
+                    update_json '.game.mods = $mods[0]' "$TEMP_MODS"
+                    jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"
+                else
+                    echo -e "${RED}Error: ModId must be exactly 16 alphanumeric characters (e.g., '595F2BF2F44836FB').${RESET}"
+                fi
             else
-                echo -e "${RED}Error: No mod ID specified. Use 'add <modid>' (e.g., 'add 123456').${RESET}"
+                echo -e "${RED}Error: No mod ID specified. Use 'add <modid>' (e.g., 'add 1234567890ABCDEF').${RESET}"
             fi
-            read -p "Press Enter to continue..." 
-            clear
-        elif [ -n "$selections" ]; then
-            # Add selected mods from the list
+        elif [[ "$selections" =~ ^enable[[:space:]]+(.+)$ ]]; then
+            enable_nums="${BASH_REMATCH[1]}"
             if [ $((active_count + installed_count)) -gt 0 ]; then
                 declare -A ALL_MODS
                 i=1
@@ -445,22 +444,30 @@ manage_mods() {
                     ((i++))
                 done
 
-                for num in $selections; do
+                enabled_count=0
+                for num in $enable_nums; do
                     if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le $((active_count + installed_count)) ]; then
                         mod_id="${ALL_MODS[$num]}"
                         jq -c --arg id "$mod_id" '. += [{"modId": $id}] | unique_by(.modId)' "$TEMP_MODS" > "$TEMP_MODS.tmp" && mv "$TEMP_MODS.tmp" "$TEMP_MODS"
+                        ((enabled_count++))
                     fi
                 done
-                update_json '.game.mods = $mods[0]' "$TEMP_MODS"
-                jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"
+                if [ "$enabled_count" -gt 0 ]; then
+                    update_json '.game.mods = $mods[0]' "$TEMP_MODS"
+                    jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"
+                    echo -e "${GREEN}Enabled $enabled_count mod(s).${RESET}"
+                else
+                    echo -e "${RED}Error: No valid mod numbers specified for enabling.${RESET}"
+                fi
             else
-                echo -e "${RED}Error: No mods available to select from.${RESET}"
+                echo -e "${RED}Error: No mods available to enable.${RESET}"
             fi
-            read -p "Press Enter to continue..." 
-            clear
         else
-            break  # Empty input exits the loop
+            echo -e "${RED}Error: Invalid option. Use 'add <modid>', 'enable <numbers>', 'disable <numbers>', or 'clear'.${RESET}"
         fi
+
+        read -p "Press Enter to continue..." 
+        clear
 
         # Ask if user wants to continue managing mods
         echo
@@ -592,12 +599,12 @@ while true; do
                 echo "    5) Set Admin Password"
                 echo "    6) Set Scenario"
                 echo "    7) Set Max Players"
-                echo "    8) Set Crossplay Platforms"
+                echo "    8) Set Crossplay"
                 echo "-----------"
                 # Game properties (matches server.json "game.gameProperties")
                 echo "  Game Properties:"
                 echo "    9) Set Server Max View Distance (Default 1600)"
-                echo "    10) Set Server Min Grass Distance (Default 0)"
+                echo "    10) Set Server Min Grass Distance (Default 50)"
                 echo "    11) Set Network View Distance (Default 1500)"
                 echo "    12) Set Disable 3rd Person"
                 echo "-----------"
@@ -734,33 +741,19 @@ while true; do
                         read -p "Press Enter to continue..." 
                         clear
                         ;;
-                    8) # Set Crossplay Platforms (game.supportedPlatforms, game.crossPlatform)
-                        CURRENT_PLATFORMS=$(get_json_value ".game.supportedPlatforms")
-                        echo "Current crossplay platforms: $CURRENT_PLATFORMS"
-                        echo "Select crossplay option:"
-                        echo "  1) All platforms (PC, Xbox, PS5) - No mods allowed"
-                        echo "  2) PC and Xbox - Mods allowed"
-                        echo "  3) PC only - Mods allowed"
-                        read -p "Enter choice (1-3): " CROSSPLAY_CHOICE
-                        case $CROSSPLAY_CHOICE in
-                            1)
-                                update_json '.game.supportedPlatforms = ["PLATFORM_PC", "PLATFORM_XBL", "PLATFORM_PSN"] | .game.crossPlatform = true'
-                                echo -e "${YELLOW}Note: PS5 does not support mods. Ensure no mods are active for PS5 crossplay.${RESET}"
-                                ;;
-                            2)
-                                update_json '.game.supportedPlatforms = ["PLATFORM_PC", "PLATFORM_XBL"] | .game.crossPlatform = true'
-                                echo -e "${GREEN}Set to PC and Xbox crossplay. Mods are allowed.${RESET}"
-                                echo -e "${YELLOW}Note: PSN players won't be able to join.${RESET}"
-                                ;;
-                            3)
-                                update_json '.game.supportedPlatforms = ["PLATFORM_PC"] | .game.crossPlatform = false'
-                                echo -e "${GREEN}Set to PC only. Mods are allowed.${RESET}"
-                                echo -e "${YELLOW}Note: XBL and PSN players won't be able to join.${RESET}"
-                                ;;
-                            *)
-                                echo -e "${RED}Error: Invalid choice. Must be 1, 2, or 3.${RESET}"
-                                ;;
-                        esac
+                    8) # Set Crossplay (game.crossPlatform)
+                        CURRENT_CROSSPLAY=$(get_json_value ".game.crossPlatform")
+                        echo "Current crossplay setting: $CURRENT_CROSSPLAY"
+                        echo "Enable crossplay between PC, Xbox, and PSN?"
+                        echo -e "${YELLOW}Note: If mods are active, PSN players cannot join, even with crossplay enabled.${RESET}"
+                        read -p "Enable crossplay? (y/N): " CROSSPLAY_CHOICE
+                        if [[ "$CROSSPLAY_CHOICE" =~ ^[Yy]$ ]]; then
+                            update_json '.game.crossPlatform = true'
+                            echo -e "${GREEN}Crossplay enabled. PC, Xbox, and PSN supported (PSN disabled if mods are used).${RESET}"
+                        else
+                            update_json '.game.crossPlatform = false'
+                            echo -e "${GREEN}Crossplay disabled. Only PC players can join.${RESET}"
+                        fi
                         read -p "Press Enter to continue..." 
                         clear
                         ;;
@@ -786,16 +779,16 @@ while true; do
                         CURRENT_GRASS_VIEW=$(get_json_value ".game.gameProperties.serverMinGrassDistance")
                         echo "Current server min grass distance: $CURRENT_GRASS_VIEW"
                         if [[ -n "$BASH_VERSION" && "${BASH_VERSINFO[0]}" -ge 4 ]]; then
-                            read -e -p "Enter new server min grass distance (default 0): " -i "$CURRENT_GRASS_VIEW" GRASS_VIEW
+                            read -e -p "Enter new server min grass distance (default 50): " -i "$CURRENT_GRASS_VIEW" GRASS_VIEW
                         else
-                            echo "Enter new server min grass distance (default 0, backspace to edit):"
+                            echo "Enter new server min grass distance (default 50, backspace to edit):"
                             read -p "[$CURRENT_GRASS_VIEW]: " GRASS_VIEW
                             [ -z "$GRASS_VIEW" ] && GRASS_VIEW="$CURRENT_GRASS_VIEW"
                         fi
-                        if [[ "$GRASS_VIEW" =~ ^[0-9]+$ ]] && [ "$GRASS_VIEW" -ge 0 ] && [ "$GRASS_VIEW" -le 150 ]; then
+                        if [[ "$GRASS_VIEW" =~ ^[0-9]+$ ]] && [ "$GRASS_VIEW" -ge 50 ] && [ "$GRASS_VIEW" -le 150 ]; then
                             update_json ".game.gameProperties.serverMinGrassDistance = $GRASS_VIEW"
                         else
-                            echo -e "${RED}Error: Server min grass distance must be a number between 0 and 150.${RESET}"
+                            echo -e "${RED}Error: Server min grass distance must be a number between 50 and 150.${RESET}"
                         fi
                         read -p "Press Enter to continue..." 
                         clear
@@ -897,3 +890,4 @@ while true; do
             ;;
     esac
 done
+
