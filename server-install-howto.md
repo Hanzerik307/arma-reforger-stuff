@@ -1,7 +1,7 @@
 ---
 title: Arma Reforger Linux Server Setup
 author: Hanzerik307
-date: March 30, 2025
+date: April 16, 2025
 ---
 
 # Intro
