@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# armar-sc.sh (CLI-Only Version) - Version 1.4 - 2025-04-09
+# armar-sc.sh (CLI-Only Version) - Version 1.4.1 - 2025-04-16
 #
 # Copyright (c) 2025 Hanzerik307
 #
@@ -330,16 +330,16 @@ manage_mods() {
 
         # Display active mods from server.json
         echo -e "${CYAN}Currently active mods in $CONFIG_FILE:${RESET}"
-        current_mods=$(jq -r '.[] | .modId' "$TEMP_MODS" 2>/dev/null)
+        current_mods=$(jq -r '.[] | [.modId, (.name // "Unknown")] | @tsv' "$TEMP_MODS" 2>/dev/null)
         active_count=0
         if [ -n "$current_mods" ]; then
             i=1
-            while IFS= read -r mod_id; do
+            while IFS=$'\t' read -r mod_id mod_name; do
                 if [ -n "${META_DATA[$mod_id]}" ]; then
-                    IFS='|' read -r name version <<< "${META_DATA[$mod_id]}"
-                    printf "${CYAN}%d) ID: %s (Name: %s, Version: %s)${RESET}\n" "$i" "$mod_id" "$name" "$version"
+                    IFS='|' read -r meta_name version <<< "${META_DATA[$mod_id]}"
+                    printf "${CYAN}%d) ID: %s (Name: %s, Version: %s)${RESET}\n" "$i" "$mod_id" "$meta_name" "$version"
                 else
-                    printf "${CYAN}%d) ID: %s${RESET}\n" "$i" "$mod_id"
+                    printf "${CYAN}%d) ID: %s (Name: %s)${RESET}\n" "$i" "$mod_id" "$mod_name"
                 fi
                 unset "INSTALLED_MODS[$mod_id]"  # Remove from installed list to avoid duplication
                 ((i++))
@@ -367,9 +367,10 @@ manage_mods() {
         fi
         echo "----------------------------------------"
         echo "Options:"
-        echo "  add <modid> (e.g., 'add 123456' Adds a new ModId from the Workshop to the server json to be downloaded/installed)"
-        echo "  enable <numbers> (e.g., 'enable 1 3 5' Enables ModIds from downloaded/installed mods in the addons directory)"
-        echo "  disable <numbers> (e.g., 'disable 1 3 4 5' Disables selected ModIds from server json)"
+        echo "  add <modid> example: add 1234567812345678 (Adds a new ModId from the Workshop to the server json to be downloaded/installed)"
+        echo "  enable <numbers> example: enable 1 3 5 (Enables ModIds from downloaded/installed mods in the addons directory)"
+        echo "  disable <numbers> example: disable 1 3 5 (Disables selected ModIds from server json)"
+        echo "  sync (Updates mod names in server json from installed mod metadata)"
         echo "  clear (Removes all ModIds from server json)"
         echo "  Or hit Enter to exit"
 
@@ -382,6 +383,29 @@ manage_mods() {
             echo -e "${GREEN}Clearing all mods...${RESET}"
             update_json '.game.mods = []'
             jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"  # Refresh temp file
+        elif [ "$selections" = "sync" ]; then
+            if [ -z "$current_mods" ]; then
+                echo -e "${YELLOW}No mods in server.json to sync.${RESET}"
+            elif [ ! -d "$ADDONS_DIR" ] || [ -z "$meta_files" ]; then
+                echo -e "${YELLOW}No mod metadata available in $ADDONS_DIR to sync names.${RESET}"
+            else
+                echo -e "${GREEN}Syncing mod names from metadata...${RESET}"
+                # Create a new mods array with updated names
+                new_mods=$(mktemp)
+                echo "[]" > "$new_mods"
+                while IFS=$'\t' read -r mod_id mod_name; do
+                    if [ -n "${META_DATA[$mod_id]}" ]; then
+                        meta_name=$(echo "${META_DATA[$mod_id]}" | cut -d'|' -f1)
+                        jq -c --arg id "$mod_id" --arg name "$meta_name" '. += [{"modId": $id, "name": $name}]' "$new_mods" > "$new_mods.tmp" && mv "$new_mods.tmp" "$new_mods"
+                    else
+                        jq -c --arg id "$mod_id" --arg name "$mod_name" '. += [{"modId": $id, "name": $name}]' "$new_mods" > "$new_mods.tmp" && mv "$new_mods.tmp" "$new_mods"
+                    fi
+                done <<< "$current_mods"
+                update_json '.game.mods = $mods[0]' "$new_mods"
+                jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"
+                rm -f "$new_mods"
+                echo -e "${GREEN}Mod names synced with metadata.${RESET}"
+            fi
         elif [[ "$selections" =~ ^disable[[:space:]]+(.+)$ ]]; then
             disable_nums="${BASH_REMATCH[1]}"
             current_count=$(jq -r 'length' "$TEMP_MODS")
@@ -418,8 +442,10 @@ manage_mods() {
                 if [[ "$new_modid" =~ ^[0-9A-Za-z]{16}$ ]]; then
                     # Convert to uppercase
                     new_modid=$(echo "$new_modid" | tr '[:lower:]' '[:upper:]')
-                    jq -c --arg id "$new_modid" '. += [{"modId": $id}] | unique_by(.modId)' "$TEMP_MODS" > "$TEMP_MODS.tmp" && mv "$TEMP_MODS.tmp" "$TEMP_MODS"
-                    echo -e "${GREEN}Mod $new_modid added.${RESET}"
+                    # Use placeholder name
+                    mod_name="Unknown"
+                    jq -c --arg id "$new_modid" --arg name "$mod_name" '. += [{"modId": $id, "name": $name}] | unique_by(.modId)' "$TEMP_MODS" > "$TEMP_MODS.tmp" && mv "$TEMP_MODS.tmp" "$TEMP_MODS"
+                    echo -e "${GREEN}Mod $new_modid (Name: $mod_name) added. Run 'sync' after mod download to update name.${RESET}"
                     update_json '.game.mods = $mods[0]' "$TEMP_MODS"
                     jq -c '.game.mods // []' "$CONFIG_FILE" > "$TEMP_MODS"
                 else
@@ -434,21 +460,22 @@ manage_mods() {
                 declare -A ALL_MODS
                 i=1
                 if [ -n "$current_mods" ]; then
-                    while IFS= read -r mod_id; do
-                        ALL_MODS["$i"]="$mod_id"
+                    while IFS=$'\t' read -r mod_id mod_name; do
+                        ALL_MODS["$i"]="$mod_id|$mod_name"
                         ((i++))
                     done <<< "$current_mods"
                 fi
                 for mod_id in "${!INSTALLED_MODS[@]}"; do
-                    ALL_MODS["$i"]="$mod_id"
+                    mod_name=$(echo "${META_DATA[$mod_id]}" | cut -d'|' -f1)
+                    ALL_MODS["$i"]="$mod_id|$mod_name"
                     ((i++))
                 done
 
                 enabled_count=0
                 for num in $enable_nums; do
                     if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -ge 1 ] && [ "$num" -le $((active_count + installed_count)) ]; then
-                        mod_id="${ALL_MODS[$num]}"
-                        jq -c --arg id "$mod_id" '. += [{"modId": $id}] | unique_by(.modId)' "$TEMP_MODS" > "$TEMP_MODS.tmp" && mv "$TEMP_MODS.tmp" "$TEMP_MODS"
+                        IFS='|' read -r mod_id mod_name <<< "${ALL_MODS[$num]}"
+                        jq -c --arg id "$mod_id" --arg name "$mod_name" '. += [{"modId": $id, "name": $name}] | unique_by(.modId)' "$TEMP_MODS" > "$TEMP_MODS.tmp" && mv "$TEMP_MODS.tmp" "$TEMP_MODS"
                         ((enabled_count++))
                     fi
                 done
@@ -463,7 +490,7 @@ manage_mods() {
                 echo -e "${RED}Error: No mods available to enable.${RESET}"
             fi
         else
-            echo -e "${RED}Error: Invalid option. Use 'add <modid>', 'enable <numbers>', 'disable <numbers>', or 'clear'.${RESET}"
+            echo -e "${RED}Error: Invalid option. Use 'add <modid>', 'enable <numbers>', 'disable <numbers>', 'sync', or 'clear'.${RESET}"
         fi
 
         read -p "Press Enter to continue..." 
@@ -609,7 +636,7 @@ while true; do
                 echo "    12) Set Disable 3rd Person"
                 echo "-----------"
                 # Mods (matches server.json "game.mods")
-                echo "  Mods:"
+                echo "  Configure Mods:"
                 echo "    13) Manage Mods"
                 echo "-----------"
                 # Review and exit
@@ -890,4 +917,3 @@ while true; do
             ;;
     esac
 done
-
