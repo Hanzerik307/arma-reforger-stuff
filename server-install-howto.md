@@ -34,7 +34,7 @@ deb-src http://deb.debian.org/debian/ bookworm-updates main contrib non-free non
 
 # Installing SteamCMD
 ## Debian 12
-Update and upgrade anything that needs it. And then install SteamCMD. Since the steam app is i386, we have to enable support for it on a 64bit system OS.
+Update and upgrade anything that needs it. And then install SteamCMD. Since the steam app is i386, we have to enable support for it on a 64bit system OS. (Note: For Debian 13 Trixie, you can omit the `sudo apt install software-properties-common`)
 ```
 sudo apt update
 sudo apt upgrade
