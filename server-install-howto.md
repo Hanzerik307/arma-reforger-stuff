@@ -1,7 +1,7 @@
 ---
 title: Arma Reforger Linux Server Setup
 author: Hanzerik307
-date: April 16, 2025
+date: May 16, 2025
 ---
 
 # Intro
@@ -94,10 +94,19 @@ nano start.sh
 ```
 ```
 #!/bin/bash
+
 # Install or Update game
-$HOME/arma/install.sh
+# $HOME/arma/install.sh
+
 # Start server
-$HOME/arma/ArmaReforgerServer -config=$HOME/arma/server.json -profile=$HOME/arma/profile -maxFPS 60
+$HOME/arma/ArmaReforgerServer \
+  -config=$HOME/arma/server.json \
+  -profile=$HOME/arma/profile \
+  -maxFPS=60 \
+  -logStats=60000 \
+  -keepNumOfLogs=5 \
+  -autoReload=30 \
+  -autoShutdown
 ```
 
 You will notice I use the $HOME environmental variable in these examples. You can see what your path would be in a terminal by typing `echo $HOME`. It should come back with something like `/home/<username>`. As long as you are starting everything as your user, $HOME should work in the scripts. Otherwise use absolute paths like `/home/<username>/arma`.
@@ -136,18 +145,14 @@ nano server.json
          "VONDisableDirectSpeechUI":false,
          "VONCanTransmitCrossFaction":false
       },
-      "mods":[
-         
-      ]
+      "mods":[]
    },
    "operating":{
       "lobbyPlayerSynchronise":true,
+      "disableNavmeshStreaming":[],
       "joinQueue":{
          "maxSize":2
-      },
-      "disableNavmeshStreaming":[
-         
-      ]
+      }
    }
 }
 ```
