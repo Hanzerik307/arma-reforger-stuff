@@ -109,7 +109,7 @@ $HOME/arma/ArmaReforgerServer \
   -autoShutdown
 ```
 
-You will notice I use the $HOME environmental variable in these examples. You can see what your path would be in a terminal by typing `echo $HOME`. It should come back with something like `/home/<username>`. As long as you are starting everything as your user, $HOME should work in the scripts. Otherwise use absolute paths like `/home/<username>/arma`.
+A note on how I set that start script up; to remove a startup parameter, remove the line and the trailing `\`. The last parameter will not have a trailing `\`, and you'll need to keep the spacing correct or it won't work.  You will also notice I use the $HOME environmental variable in these examples. You can see what your path would be in a terminal by typing `echo $HOME`. It should come back with something like `/home/<username>`. As long as you are starting everything as your user, $HOME should work in the scripts. Otherwise use absolute paths like `/home/<username>/arma`.
 
 # Setting up the Server
 
