@@ -4,5 +4,7 @@ You will need to install python3-pyqt5 and jq for this to work. Most systems wil
 
 chmod 755 armar-sc-gui.py
 Python script would go in in `~/bin`
+
 Desktop file would go in `~/.local/share/applications/`
+
 Icon will would go in `~/.local/share/icons/`
