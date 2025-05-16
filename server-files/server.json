@@ -25,9 +25,10 @@
   },
   "operating": {
     "lobbyPlayerSynchronise": true,
+    "disableNavmeshStreaming": [],
     "joinQueue": {
       "maxSize": 2
-    },
-    "disableNavmeshStreaming": []
+    }
+    
   }
 }
