@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Arma Reforger Server Control
+Comment=GUI For Managing Arma Reforger server
+Exec=/home/<username>/bin/armar-sc-gui.py
+Icon=armar-icon
+Terminal=false
+Categories=Game;Utility;
+StartupNotify=true
