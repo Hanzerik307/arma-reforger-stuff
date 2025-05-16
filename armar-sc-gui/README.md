@@ -3,6 +3,7 @@ If you followed my How-To, to include setting up yuor server as a `systemd --use
 You will need to install python3-pyqt5 and jq for this to work. Most systems will already have systemd installed by default.
 
 chmod 755 armar-sc-gui.py
+
 Python script would go in in `~/bin`
 
 Desktop file would go in `~/.local/share/applications/`
