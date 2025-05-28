@@ -5,7 +5,7 @@ date: May 16, 2025
 ---
 
 # Intro
-This guide is geared towards folks who want to self-host an Arma Reforger Game server on Linux. In this guide I'm going to describe how I installed my own self-hosted dedicated Linux (Debian Based) ArmaReforger Server. Mine is currently set up on a little BeeLink SER5 Pro AMD Ryzen 7 5850U, 32GB Ram, 500GB SSD, running headless next to my PS5. This guide should work with most .deb based systems like Debian, Linux Mint, and Ubuntu.
+This guide is geared towards folks who want to self-host an Arma Reforger Game server on Linux. In this guide I'm going to describe how I installed my own self-hosted dedicated Linux (Debian Based) ArmaReforger Server. Mine is currently set up on a little BeeLink SER5 Pro AMD Ryzen 7 5825, 32GB Ram, 500GB SSD, running headless next to my PS5. This guide should work with most .deb based systems like Debian, Linux Mint, and Ubuntu.
 
 # What you will need
 
