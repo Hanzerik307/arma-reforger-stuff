@@ -19,11 +19,11 @@ Desktop file would go in `~/.local/share/applications/`
 Icon will would go in `~/.local/share/icons/`
 
 
-![Screenshot from 2025-06-17 12-02-16](https://github.com/user-attachments/assets/8d2ec9d2-e98d-4f55-b024-11c17dbbaf6d)
+![pic](screen-shots/ss1.png)
 
-![Screenshot from 2025-06-17 12-02-34](https://github.com/user-attachments/assets/45219ea4-be89-480d-a79a-da5eddc39f27)
+![pic](screen-shots/ss2.png)
 
-![Screenshot from 2025-06-17 12-02-46](https://github.com/user-attachments/assets/b6e74cb4-462f-4fc3-a05a-da7b4db4019f)
+![pic](screen-shots/ss3.png)
 
-![Screenshot from 2025-06-17 12-02-56](https://github.com/user-attachments/assets/1e7b9198-eb60-4f88-a49e-b53f4664c26d)
+![pic](screen-shots/ss4.png)
 
