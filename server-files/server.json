@@ -1,5 +1,5 @@
 {
-  "publicAddress": "123.123.123.",
+  "publicAddress": "123.123.123.123",
   "publicPort": 2001,
   "game": {
     "name": "Wyoming 307",
