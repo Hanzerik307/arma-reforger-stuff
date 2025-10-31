@@ -60,9 +60,9 @@ class AddModsDialog(QDialog):
         self.setWindowTitle("Add Multiple Mods")
         self.setGeometry(100, 100, 400, 300)
         layout = QVBoxLayout()
-        layout.addWidget(QLabel("Enter up to 5 Mod IDs (16 alphanumeric characters each). Empty fields are ignored:"))
+        layout.addWidget(QLabel("Enter up to 10 Mod IDs (16 alphanumeric characters each). Empty fields are ignored:"))
         self.mod_inputs = []
-        for i in range(5):
+        for i in range(10):
             mod_input = QLineEdit()
             mod_input.setPlaceholderText(f"Mod ID {i+1} (e.g., ABCDEF1234567890)")
             self.mod_inputs.append(mod_input)
@@ -110,6 +110,11 @@ class ArmaServerControlApp(QMainWindow):
             ("{7C491B1FCC0FF0E1}Missions/CAH_LeMoule.conf", "Capture & Hold: Le Moule"),
             ("{6EA2E454519E5869}Missions/CAH_Military_Base.conf", "Capture & Hold: Camp Blake"),
             ("{2B4183DF23E88249}Missions/CAH_Morton.conf", "Capture & Hold: Morton"),
+            ("{0220741028718E7F}Missions/23_Campaign_HQC_Everon.conf", "Conflict: HQ Commander - Everon"),
+	        ("{68D1240A11492545}Missions/23_Campaign_HQC_Arland.conf", "Conflict: HQ Commander - Arland"),
+            ("{BB5345C22DD2B655}Missions/23_Campaign_HQC_Cain.conf", "Conflict: HQ Commander - Kolguyev"),
+	        ("{CB347F2F10065C9C}Missions/CombatOpsCain.conf", "Combat Ops - Kolguyev"),
+	        ("{F45C6C15D31252E6}Missions/27_GM_Cain.conf", "Game Master - Kolguyev"),
         ]
 
         self.central_widget = QWidget()
