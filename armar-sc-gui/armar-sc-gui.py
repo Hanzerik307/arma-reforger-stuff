@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# armar-sc-gui.py - Version 1.2 - 2025-05-14
+# armar-sc-gui.py - Version 1.6 - 2025-11-11
 #
 # Dependencies: python3-pyqt5, jq, systemd 
 # To Install Dependencies: (Debian/Ubuntu): sudo apt install python3-pyqt5 jq systemd
@@ -387,6 +387,8 @@ class ArmaServerControlApp(QMainWindow):
         self.load_session_save_input.setPlaceholderText("e.g., MySaveFile (optional)")
         self.log_voting_checkbox = QCheckBox("Enable Log Voting")
         self.disable_ai_checkbox = QCheckBox("Enable Disable AI")
+        self.encode_as_long_jobs_checkbox = QCheckBox("Enable rplEncodeAsLongJobs (Can Help With Performance)")
+        self.disable_nav_mesh_checkbox = QCheckBox("Enable disableNavmeshStreaming (Can Help With Performance)")
         param_widgets = [
             (self.max_fps_checkbox, self.max_fps_input, "Max FPS (1-240):"),
             (self.log_stats_checkbox, self.log_stats_input, "Log Stats (ms, 1000-3600000):"),
@@ -397,6 +399,8 @@ class ArmaServerControlApp(QMainWindow):
             (self.load_session_save_checkbox, self.load_session_save_input, "Load Session Save (optional):"),
             (self.log_voting_checkbox, None, ""),
             (self.disable_ai_checkbox, None, ""),
+            (self.encode_as_long_jobs_checkbox, None, ""),
+            (self.disable_nav_mesh_checkbox, None, ""),
         ]
         for checkbox, input_field, label_text in param_widgets:
             layout = QHBoxLayout()
@@ -950,6 +954,8 @@ class ArmaServerControlApp(QMainWindow):
                 (r'-loadSessionSave(?!\=)', self.load_session_save_checkbox, None),
                 (r'-logVoting', self.log_voting_checkbox, None),
                 (r'-disableAI', self.disable_ai_checkbox, None),
+                (r'-rplEncodeAsLongJobs', self.encode_as_long_jobs_checkbox, None),
+                (r'-disableNavmeshStreaming', self.disable_nav_mesh_checkbox, None),
             ]
             for pattern, checkbox, input_field in param_patterns:
                 match = re.search(pattern, content)
@@ -1027,6 +1033,10 @@ class ArmaServerControlApp(QMainWindow):
                 lines.append(f"  -logVoting \\")
             if self.disable_ai_checkbox.isChecked():
                 lines.append(f"  -disableAI \\")
+            if self.encode_as_long_jobs_checkbox.isChecked():
+                lines.append(f"  -rplEncodeAsLongJobs \\")
+            if self.disable_nav_mesh_checkbox.isChecked():
+                lines.append(f"  -disableNavmeshStreaming \\")
             lines[-1] = lines[-1].rstrip(" \\")
             with open(self.start_script, 'w') as f:
                 f.write("\n".join(lines))
