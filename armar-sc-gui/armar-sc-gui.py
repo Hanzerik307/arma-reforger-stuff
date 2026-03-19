@@ -2,7 +2,7 @@
 #
 # armar-sc-gui.py - Version 1.6 - 2025-11-11
 #
-# Dependencies: python3-pyqt5, jq, systemd 
+# Dependencies: python3-pyqt5, jq, systemd
 # To Install Dependencies: (Debian/Ubuntu): sudo apt install python3-pyqt5 jq systemd
 # 
 #
@@ -111,10 +111,10 @@ class ArmaServerControlApp(QMainWindow):
             ("{6EA2E454519E5869}Missions/CAH_Military_Base.conf", "Capture & Hold: Camp Blake"),
             ("{2B4183DF23E88249}Missions/CAH_Morton.conf", "Capture & Hold: Morton"),
             ("{0220741028718E7F}Missions/23_Campaign_HQC_Everon.conf", "Conflict: HQ Commander - Everon"),
-	        ("{68D1240A11492545}Missions/23_Campaign_HQC_Arland.conf", "Conflict: HQ Commander - Arland"),
+			("{68D1240A11492545}Missions/23_Campaign_HQC_Arland.conf", "Conflict: HQ Commander - Arland"),
             ("{BB5345C22DD2B655}Missions/23_Campaign_HQC_Cain.conf", "Conflict: HQ Commander - Kolguyev"),
-	        ("{CB347F2F10065C9C}Missions/CombatOpsCain.conf", "Combat Ops - Kolguyev"),
-	        ("{F45C6C15D31252E6}Missions/27_GM_Cain.conf", "Game Master - Kolguyev"),
+			("{CB347F2F10065C9C}Missions/CombatOpsCain.conf", "Combat Ops - Kolguyev"),
+			("{F45C6C15D31252E6}Missions/27_GM_Cain.conf", "Game Master - Kolguyev"),
         ]
 
         self.central_widget = QWidget()
