@@ -1,7 +1,7 @@
 ---
 title: Arma Reforger Linux Server Setup
 author: Hanzerik307
-date: May 16, 2025
+date: Mar 31, 2026
 ---
 
 # Intro
@@ -9,7 +9,7 @@ This guide is geared towards folks who want to self-host an Arma Reforger Game s
 
 # What you will need
 
-* A PC Debian based Linux OS (Maybe a VM on Windows will work, haven't tried)
+* A PC Debian based Linux OS (Maybe a Debian VM on Windows will work, haven't tried)
 * Static IP address for the server (Local Network i.e. 192.168.1.69)
 * Steamcmd
 * Some Type of basic text editor: vim, nano, note pad, gedit, etc
@@ -18,34 +18,22 @@ I do everything via ssh terminal, so these will all be console command instructi
 
 # Getting Started
 
-Make sure your Debain 12 distro has the `non-free and non-free-firmware` repositories set up in your `/etc/apt/sources.list` this is for installing `steamcmd`. Ubuntu Server can use the commands a little bit further down in this guide without having to edit anything by hand.
+Make sure your Debain distro has the `non-free and non-free-firmware` repositories set up in your `/etc/apt/sources.list` this is for installing `steamcmd`. I only use Debian so these instructions are for that Distro, but can be used with Ubuntu with a little tweaking.
 
-Here is what it looks like on Debian 12 stable:
+Here is what it looks like on Debian 13 (Trixie) stable:
 ```
-deb http://deb.debian.org/debian/ bookworm main contrib non-free non-free-firmware
-deb-src http://deb.debian.org/debian/ bookworm main contrib non-free non-free-firmware
-
-deb http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
-deb-src http://security.debian.org/debian-security bookworm-security main contrib non-free non-free-firmware
-
-deb http://deb.debian.org/debian/ bookworm-updates main contrib non-free non-free-firmware
-deb-src http://deb.debian.org/debian/ bookworm-updates main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian trixie main contrib non-free non-free-firmware
+deb http://deb.debian.org/debian trixie-updates main contrib non-free non-free-firmware 
+deb http://deb.debian.org/debian-security/ trixie-security main contrib non-free non-free-firmware
 ```
 
 # Installing SteamCMD
-## Debian 12
-Update and upgrade anything that needs it. And then install SteamCMD. Since the steam app is i386, we have to enable support for it on a 64bit system OS. (Note: For Debian 13 Trixie, you can omit the `sudo apt install software-properties-common`)
+## Debian 13
+Update and upgrade anything that needs it. And then install SteamCMD. Since the steam app is i386, we have to enable support for it on a 64bit system OS.
 ```
 sudo apt update
 sudo apt upgrade
-sudo apt install software-properties-common
-sudo dpkg --add-architecture i386
-sudo apt update
-sudo apt install steamcmd
-```
-## Ubuntu
-```
-sudo add-apt-repository multiverse
+sudo apt install software-properties-common (***Debian 12 Specific requirement, Not Needed for Debian 13***)
 sudo dpkg --add-architecture i386
 sudo apt update
 sudo apt install steamcmd
@@ -127,9 +115,7 @@ nano server.json
       "name":"YOUR_SERVER_NAME",
       "password":"",
       "passwordAdmin":"SET_ADMIN_PASSWORD_HERE",
-      "admins":[
-         
-      ],
+      "admins":[],
       "scenarioId":"{DAA03C6E6099D50F}Missions/24_CombatOps.conf",
       "maxPlayers":6,
       "visible":true,
