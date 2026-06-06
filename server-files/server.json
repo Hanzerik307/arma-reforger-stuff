@@ -29,6 +29,5 @@
     "joinQueue": {
       "maxSize": 2
     }
-    
   }
 }
